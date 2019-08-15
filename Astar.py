@@ -1,7 +1,7 @@
 import math
 
 
-class Astar():
+class Astar:
 
     def __init__(self, graph):
         self.graph = graph
@@ -16,16 +16,18 @@ class Astar():
                 start_node = node
             if node.pos[0] == end_pos[0] and node.pos[1] == end_pos[1]:
                 end_node = node
-        if not start_node or not end_node:
-            print("Astar:        This position is not a node")
+        if not start_node:
+            start_node = self.search_closest_node(start_pos)
+        if not end_node:
+            end_node = self.search_closest_node(end_pos)
 
         # Compute path
         path = self.astar_search(start_node, end_node)
 
         # Calculate total distance
         distance = 0
-        for i in range(len(path)-1):
-            distance += calculate_euclidean_distance(path[i].pos, path[i+1].pos)
+        for i in range(len(path) - 1):
+            distance += calculate_euclidean_distance(path[i].pos, path[i + 1].pos)
 
         return distance, path
 
@@ -61,6 +63,16 @@ class Astar():
                     neighbor.parent = current
                     openset.add(neighbor)
         return None
+
+    def search_closest_node(self, position):
+        closest_node = None
+        min_distance = 1000
+        for node in self.graph:
+            distance = calculate_euclidean_distance(position, node.pos)
+            if distance < min_distance:
+                min_distance = distance
+                closest_node = node
+        return closest_node
 
 
 def heuristic(node_a, node_b):

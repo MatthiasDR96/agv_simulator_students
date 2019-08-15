@@ -1,5 +1,6 @@
-import numpy as np
 from random import randint
+
+import numpy as np
 
 iteration = 100000
 number_robots = 5
@@ -13,7 +14,7 @@ for i in range(iteration):
     # Make solution
     x = np.zeros((number_robots, number_tasks))
     for j in range(number_tasks):
-        k = randint(0, number_robots-1)
+        k = randint(0, number_robots - 1)
         x[k][j] = 1
 
     # Calculate fitness
