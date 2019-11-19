@@ -26,7 +26,7 @@ class Node:
         return cost
 
     def to_string(self):
-        return str("Name: " + self.name + ", x: " + str(self.pos[0]) + ", y: " + str(self.pos[1]))
+        return str(str(self.pos[0]) + "," + str(self.pos[1]))
 
     def is_equal(self, node):
         if self.name == node.name:

@@ -1,5 +1,3 @@
-import logging
-import logging.handlers
 import math
 
 import matplotlib
@@ -23,13 +21,14 @@ class Renderer:
         self.tasks_executing = tasks_executing
         self.depot_locations = depot_locations
         self.charge_locations = charge_locations
+        self.tasks_not_executing_monitor = []
         self.colors = matplotlib.cm.rainbow(np.linspace(0, 1, len(global_robot_list.items)))
 
         # Processes
         self.render_scene = self.env.process(self.render_scene())
         self.status_monitor_update = self.env.process(self.status_monitor_update())
         self.battery_status_monitor_update = self.env.process(self.battery_status_monitor_update())
-        self.logging = self.env.process(self.logging())
+        # self.tasks_not_executing_monitor_update = self.env.process(self.tasks_not_executing_monitor_update())
 
         # Initiate plt
         plt.close("all")
@@ -67,6 +66,8 @@ class Renderer:
                 plt.arrow(robot.position[0], robot.position[1], math.cos(robot.heading_direction),
                           math.sin(robot.heading_direction), width=0.3, color=color)
                 plt.text(robot.position[0] + 0.5, robot.position[1] + 1.5, str("AGV" + str(robot.ID)))
+
+                # Plot path
                 if robot.path:
                     plt.plot([robot.position[0], robot.path[0].pos[0]], [robot.position[1], robot.path[0].pos[1]],
                              color=color, lw=1.0)
@@ -75,6 +76,12 @@ class Renderer:
                         if i < len(robot.path) - 1:
                             plt.plot([robot.path[i].pos[0], robot.path[i + 1].pos[0]],
                                      [robot.path[i].pos[1], robot.path[i + 1].pos[1]], color=color, lw=1.5)
+
+                # Plot assigned tasks
+                list = self.local_task_lists[robot.ID - 1]
+                for item in list.items:
+                    plt.plot([robot.position[0], item.pos_A[0]],
+                             [robot.position[1], item.pos_A[1]], color=color, lw=0.5)
 
             # Plot tasks not executing
             for task in self.global_task_list.items:
@@ -131,50 +138,19 @@ class Renderer:
                 plt.plot(battery_status_monitor_x, battery_status_monitor_y, 'b')
                 plt.plot(battery_status_monitor_x, np.repeat(20, len(battery_status_monitor_x)), 'r')
 
-    def logging(self):
-
-        # Create loggers
-        log_filename_1 = 'global_task_list.log'
-        log_filename_2 = 'local_task_lists.log'
-        log_filename_3 = 'robot_paths.log'
-        log_filename_4 = 'tasks_executing.log'
-
-        log1 = logging.getLogger('MyLogger1')
-        log1.setLevel(logging.DEBUG)
-        handler1 = logging.handlers.RotatingFileHandler(
-            log_filename_1, backupCount=1, mode='w')
-        log1.addHandler(handler1)
-
-        log2 = logging.getLogger('MyLogger2')
-        log2.setLevel(logging.DEBUG)
-        handler2 = logging.handlers.RotatingFileHandler(
-            log_filename_2, backupCount=1, mode='w')
-        log2.addHandler(handler2)
-
-        log3 = logging.getLogger('MyLogger3')
-        log3.setLevel(logging.DEBUG)
-        handler3 = logging.handlers.RotatingFileHandler(
-            log_filename_3, backupCount=1, mode='w')
-        log3.addHandler(handler3)
-
-        log4 = logging.getLogger('MyLogger4')
-        log4.setLevel(logging.DEBUG)
-        handler4 = logging.handlers.RotatingFileHandler(
-            log_filename_4, backupCount=1, mode='w')
-        log4.addHandler(handler4)
+    def tasks_not_executing_monitor_update(self):
 
         while True:
             yield self.env.timeout(1)
-            log1.debug("At simulation time: " + str(self.env.now) + ":\t" + str(
-                [task.to_string() for task in self.global_task_list.items]))
-            robots = np.copy(self.global_robot_list.items)
-            robots = sorted(robots, key=lambda robot: robot.ID)
-            for i in range(len(self.local_task_lists)):
-                log2.debug("At simulation time: " + str(self.env.now) + ":\t" + "robot " + str(i + 1) + "\t" + str(
-                    [task.to_string() for task in self.local_task_lists[i].items]))
-            for i in range(len(robots)):
-                if robots[i].path:
-                    log3.debug("At simulation time: " + str(self.env.now) + ":\t" + "robot " + str(i + 1) + "\t" + str(
-                        [node.to_string() for node in robots[i].path]))
-            log4.debug("At simulation time: " + str(self.env.now) + ":\t" + str(
-                [task.to_string() for task in self.tasks_executing.items]))
+            tasks_not_executing = np.sum(
+                [len(self.local_task_lists[i].items) for i in range(len(self.global_robot_list.items))])
+            self.tasks_not_executing_monitor.append(tasks_not_executing)
+            monitor_tasks_not_executing_y = self.tasks_not_executing_monitor
+            monitor_tasks_not_executing_x = np.arange(len(monitor_tasks_not_executing_y))
+            plt.figure(3)
+            plt.title("Tasks not executing")
+            plt.ylabel("Amount of tasks not executing")
+            plt.xlabel("Simulation time (s)")
+            plt.plot(monitor_tasks_not_executing_x, monitor_tasks_not_executing_y)
+            plt.draw()
+            plt.pause(0.0001)

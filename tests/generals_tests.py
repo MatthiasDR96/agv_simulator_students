@@ -1,9 +1,15 @@
-import numpy as np
+# Open file
+file1 = open("orders_1.txt", "r")
 
-a = np.array([0, 2, 3, 4])
+line = 'a'
+while line != "":
 
-print(a)
+    # Read order
+    line = file1.readline()
+    order = line.split(',')
+    for i in range(0, len(order[3])):
+        order[3][i] = int(order[3][i])
+    print(order[3])
+    print(order[3])
 
-a = a[1:]
-
-print(a)
+file1.close()

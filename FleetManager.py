@@ -1,6 +1,5 @@
 import math
 
-import matplotlib.pyplot as plt
 import numpy as np
 from ortools.sat.python import cp_model
 
@@ -14,16 +13,11 @@ class FleetManager:
         self.global_task_list = global_task_list  # Fleet manager uses this list as start to assign tasks
         self.global_robot_list = global_robot_list  # Fleet manager uses this list to obtain AGV information
         self.local_task_lists = local_task_lists  # Fleet manager uses this list to send the assignments to the AGVs
-        self.update_interval = 1  # Interval of updating the assignments
         self.astar = astar  # Astar shortest path finder
+        self.fitness_file = open("logfiles/fitness_values.txt", "w")
 
-        # Monitoring attributes
-        self.tasks_not_executing = 0
-        self.tasks_not_executing_monitor = []
-
-        # Processes
+        # Process
         self.main = self.env.process(self.main())
-        # self.monitor_tasks_not_executing_update = self.env.process(self.monitor_tasks_not_executing_update())
 
         # Initialize
         print("Fleet manager:    Started")
@@ -34,10 +28,10 @@ class FleetManager:
         while True:
 
             # Timeout
-            yield self.env.timeout(self.update_interval)
+            yield self.env.timeout(1)  # Sample time
 
             # Define current status
-            robots, tasks, distance_matrix = self.define_current_status()
+            robots, tasks, cost_matrix = self.define_current_status()
             # print('FleetManager:     Task list at ' + str(self.env.now) + ': ' + str(
             # [task.to_string() for task in tasks]))
             # print('FleetManager:     Robot list at ' + str(self.env.now) + ': ' + str(
@@ -47,7 +41,10 @@ class FleetManager:
             if not len(tasks) == 0 and not len(robots) == 0:
 
                 # Optimization
-                fitness, solution = optimization(len(robots), len(tasks), distance_matrix)
+                fitness, solution = optimization(len(robots), len(tasks), cost_matrix)
+
+                # Log fitness values for each assignment
+                self.fitness_file.write(str(self.env.now) + "," + str(fitness) + ",\n")
 
                 # Clear previous assignment
                 for task_list in self.local_task_lists:
@@ -59,31 +56,31 @@ class FleetManager:
                 for i in range(len(robots)):
                     for j in range(len(tasks)):
                         if solution[i][j] == 1:
-                            self.local_task_lists[i].put(tasks[j])
+                            self.local_task_lists[robots[i].ID - 1].put(tasks[j])
                             # print("FleetManager:     Assigned task " + str(tasks[j].order_number) +" to AGV " +
                             # str(robots[i].ID) + " at " + str(self.env.now))
-
-            # Monitor tasks not executing
-            self.tasks_not_executing = np.sum([len(self.local_task_lists[i].items) for i in range(len(robots))])
+            else:
+                # Log fitness values for no assignment (0.0)
+                self.fitness_file.write(str(self.env.now) + "," + str(0.0) + ",\n")
 
     def define_current_status(self):
 
         # Copy robot list
         robots = np.copy(self.global_robot_list.items)
-        robots = sorted(robots, key=lambda robot_: robot.ID)
+        robots = sorted(robots, key=lambda robot_: robot_.ID)
 
         # Remove robots which are charging or have troubles
         robots_ = []
         for robot in robots:
-            if not robot.status == 'EMPTY':
-                robots_ = np.append(robots_, robot)
+            if not robot.status == 'EMPTY' and not robot.status == 'CHARGING':
+                robots_.append(robot)
 
         # Copy global task list
         tasks = np.copy(self.global_task_list.items)
         number_robots = len(robots_)
         number_tasks = len(tasks)
 
-        # Compute distance matrix
+        # Compute cost matrix
         cost_matrix = np.zeros((number_robots, number_tasks))
         for i in range(number_robots):
             for j in range(number_tasks):
@@ -92,27 +89,13 @@ class FleetManager:
                 cost_matrix[i, j] = (distance_ra + distance_ab)
         return robots_, tasks, cost_matrix
 
-    def monitor_tasks_not_executing_update(self):
-
-        while True:
-            yield self.env.timeout(1)
-            self.tasks_not_executing_monitor.append(self.tasks_not_executing)
-            monitor_tasks_not_executing_y = self.tasks_not_executing_monitor
-            monitor_tasks_not_executing_x = np.arange(len(monitor_tasks_not_executing_y))
-            plt.figure(3)
-            plt.title("Tasks not executing")
-            plt.ylabel("Amount of tasks not executing")
-            plt.xlabel("Simulation time (s)")
-            plt.plot(monitor_tasks_not_executing_x, monitor_tasks_not_executing_y)
-            plt.draw()
-            plt.pause(0.0001)
-
 
 def calculate_euclidean_distance(a, b):
     return math.sqrt(math.pow((b[0] - a[0]), 2) + math.pow((b[1] - a[1]), 2))
 
 
 def optimization(number_robots, number_tasks, distance_matrix):
+
     # Cost matrix
     cost = distance_matrix.astype(int)
 
@@ -128,8 +111,7 @@ def optimization(number_robots, number_tasks, distance_matrix):
         x.append(t)
 
     # Constraints: Each task is assigned to exact one robot.
-    [model.Add(sum(x[i][j] for i in range(number_robots)) == 1)
-     for j in range(number_tasks)]
+    [model.Add(sum(x[i][j] for i in range(number_robots)) == 1) for j in range(number_tasks)]
 
     # Solve
     model.Minimize(sum([np.dot(x_row, cost_row) for (x_row, cost_row) in zip(x, cost)]))
@@ -138,7 +120,6 @@ def optimization(number_robots, number_tasks, distance_matrix):
 
     best_solution = []
     if status == cp_model.OPTIMAL:
-        # print('Minimum cost = %i' % solver.ObjectiveValue())
         for i in range(number_robots):
             t = []
             for j in range(number_tasks):

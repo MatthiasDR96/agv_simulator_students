@@ -49,7 +49,6 @@ class Astar:
             openset.remove(current)
             closedset.add(current)
             for neighbor in current.neighbors:
-                # print("\t Neighbor: " + neighbor.name)
                 if neighbor in closedset:
                     continue
                 if neighbor in openset:

@@ -1,11 +1,8 @@
 import math
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from Robot import Robot
-
-plt.ion()
 
 
 class AGV:
@@ -22,10 +19,8 @@ class AGV:
         self.global_robot_list = global_robot_list  # AGV updates its internal parameters to this list
         self.robot_location = start_location  # Current AGV location
         self.astar = astar  # Astar shortest path planner
-        self.collision_threshold = 0.5  # Collision radius
         self.battery_threshold = 20  # Percentage of battery status when the AGV needs to charge
         self.max_charging_time = 3600  # One hour to charge fully
-        self.collision = False  # If AGV is in collision
         self.heading_direction = 0  # Direction towards which the AGV is driving
         self.path = []  # Current path to execute
         self.task_execution_time = task_execution_time
@@ -39,7 +34,6 @@ class AGV:
         # Processes
         self.main = self.env.process(self.main())
         self.status_manager = self.env.process(self.status_manager())
-        self.collision_monitor = self.env.process(self.collision_monitor())
 
         # Initialize
         print("AGV " + str(self.ID) + ":            Started")
@@ -64,6 +58,7 @@ class AGV:
                 print("AGV " + str(self.ID) + ":            Start executing task " + str(item.to_string()) + " at " +
                       str(self.env.now))
                 self.status = 'BUSY'
+                self.update_robot_status()
 
                 # Remove task from local and global task list and add to executing list
                 self.local_task_list.get(lambda task: task.order_number == item.order_number)
@@ -96,6 +91,7 @@ class AGV:
                     break
                 else:
                     self.status = 'IDLE'
+                    self.update_robot_status()
 
             if self.status == 'EMPTY':
                 # Go to closest charging station and charge fully
@@ -104,8 +100,11 @@ class AGV:
     def charge(self):
 
         # Search for closest charging station and go to that station
+        self.status = 'CHARGING'
+        self.update_robot_status()
         print("AGV " + str(self.ID) + ":            Goes to closest charging station at " + str(self.env.now))
         closest_charging_station = self.search_closest_charging_station()
+
         yield self.env.process(self.execute_path(closest_charging_station))
 
         # Compute amount to charge and charge
@@ -145,8 +144,6 @@ class AGV:
                 new_x = round(self.robot_location[0] + delta_x, 2)
                 new_y = round(self.robot_location[1] + delta_y, 2)
                 yield self.env.process(self.move(new_x, new_y, travel_time))
-                if self.status == 'EMPTY':
-                    print("AGV " + str(self.ID) + ":            Needs to charge at " + str(self.env.now))
 
             # To be sure the AGV is exact on the node
             self.robot_location = (node.pos[0], node.pos[1])
@@ -156,47 +153,23 @@ class AGV:
     def move(self, x, y, travel_time):
         self.heading_direction = math.atan2((y - self.robot_location[1]), (x - self.robot_location[0]))
         self.update_robot_status()
-        # if not self.collision:
         yield self.env.timeout(travel_time)
-        self.battery_status = self.battery_status - compute_charge_loss(travel_time)
+        self.battery_status = round((self.battery_status - compute_charge_loss(travel_time)), 2)
         self.robot_location = (x, y)
         self.update_robot_status()
-        # else:
-        # print("AGV " + str(self.ID) + ":            Stopped at " + str(self.env.now))
-        # while self.collision:
-        # yield self.env.timeout(1)
-        # print("AGV " + str(self.ID) + ":            Continued again at " + str(self.env.now))
 
     def update_robot_status(self):
-        self.global_robot_list.get(lambda robot_: robot.ID == self.ID)
+        self.global_robot_list.get(lambda robot_: robot_.ID == self.ID)
         robot = Robot(self.ID, self.robot_location, self.heading_direction, self.path, self.status, self.battery_status)
         self.global_robot_list.put(robot)
-
-    def collision_monitor(self):
-        while True:
-            yield self.env.timeout(0.01)
-            robots = self.global_robot_list.items
-            robots = sorted(robots, key=lambda robot_: robot.ID)
-            distances = [100]
-            for robot in robots:
-                if not robot.ID == self.ID:
-                    # True if there is a robot in front of us
-                    same_heading = almost_equal((math.atan2((robot.position[1] - self.robot_location[1]),
-                                                            (robot.position[0] - self.robot_location[0]))),
-                                                self.heading_direction)
-                    if same_heading:
-                        distances.append(calculate_euclidean_distance(self.robot_location, robot.position))
-            if np.min(distances) < self.collision_threshold:
-                self.collision = True
-            else:
-                self.collision = False
 
     def status_manager(self):
         while True:
             yield self.env.timeout(0.01)
-            if self.battery_status < self.battery_threshold:
-                self.status = 'EMPTY'
-                self.update_robot_status()
+            if not self.status == 'CHARGING':
+                if self.battery_status < self.battery_threshold:
+                    self.status = 'EMPTY'
+                    self.update_robot_status()
 
     def search_closest_charging_station(self):
         closest_point = None
@@ -215,7 +188,7 @@ class AGV:
 
     def terminate_task(self, order_number):
         self.global_task_list.get(lambda task: task.order_number == order_number)
-        print("AGV " + str(self.ID) + ":            terminated task with order number: " + str(order_number))
+        # print("AGV " + str(self.ID) + ":            terminated task with order number: " + str(order_number))
 
     def get_first_task(self, task):
         distance, _ = self.astar.find_shortest_path(task.pos_A, self.robot_location)

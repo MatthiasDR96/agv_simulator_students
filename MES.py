@@ -1,20 +1,15 @@
-from random import randint
-
 from Task import Task
 
 
 class MES:
 
-    def __init__(self, env, global_task_list, task_locations, amount_of_tasks, max_time_interval, tasks_executing):
+    def __init__(self, env, global_task_list, tasks_executing, order_list):
 
         # Attributes
-        self.env = env
+        self.env = env  # Environment
         self.global_task_list = global_task_list  # MES writes new tasks to this list
-        self.task_locations = task_locations  # Locations where tasks can be spawned
-        self.amount_of_tasks = amount_of_tasks  # Amount of tasks which needs to be done in the simulation
-        self.max_time_interval = max_time_interval  # Max interval between the task arrivals
-        self.priorities = [1, 2, 3]  # Task priorities
-        self.tasks_executing = tasks_executing
+        self.tasks_executing = tasks_executing  # Tasks which are still executing (for end criterium)
+        self.order_list = order_list  # List of orders to spawn
 
         # Processes
         self.main = self.env.process(self.main())
@@ -24,40 +19,40 @@ class MES:
 
     def main(self):
 
-        for i in range(self.amount_of_tasks):
+        # Open file
+        file = open(self.order_list, "r")
 
-            # Random time interval between task announcements
-            yield self.env.timeout(randint(0, self.max_time_interval))
+        # Read order
+        line = file.readline()
+        order = line.split(',')
+        prev_time = 0
+        while line != "":
+            # Calculate spawn time and wait for this time
+            execution_time = int(order[0])
+            timeout = execution_time - prev_time
+            prev_time = execution_time
+            yield self.env.timeout(timeout)
 
-            # Generate random order number of four digits
-            order_number = randint(0, 9) * 1000 + randint(0, 9) * 100 + randint(0, 9) * 10 + randint(0, 9)
+            # Create new task
+            order_number = int(order[1])
+            pos_a = (int(order[3]), int(order[4]))
+            pos_b = (int(order[5]), int(order[6]))
+            priority = int(order[2])
+            new_task = Task(order_number, pos_a, pos_b, priority)
 
-            # Generate random task priority
-            priority = self.priorities[randint(0, 2)]
+            # Put the new task in the global task list
+            self.global_task_list.put(new_task)
+            print('MES:              New task ' + new_task.to_string() + ' arrived at ' + str(self.env.now))
 
-            # Generate two random task locations from the layout
-            pos_a = self.task_locations[randint(0, len(self.task_locations) - 1)]
-            pos_b = self.task_locations[randint(0, len(self.task_locations) - 1)]
+            # Read order
+            line = file.readline()
+            order = line.split(',')
 
-            # Look if the order number is already used in global task list
-            same_order_number = False
-            for task in self.global_task_list.items:
-                if task.order_number == order_number:
-                    same_order_number = True
-                    break
+        # Close file
+        file.close()
 
-            # If pick-up and drop-off locations are different, and the order number is not used already, create task
-            if (not (pos_a[0] == pos_b[0] and pos_a[1] == pos_b[1])) and not same_order_number:
-                # Create task instance
-                new_task = Task(order_number, pos_a, pos_b, priority)
-
-                # Put the new task in the global task list
-                self.global_task_list.put(new_task)
-                print('MES:              New task ' + new_task.to_string() + ' arrived at ' + str(self.env.now))
-
+        # Wait till all tasks are executed
         while True:
-
             yield self.env.timeout(1)
             if len(self.tasks_executing.items) == 0 and len(self.global_task_list.items) == 0:
-                print("\nEnd of simulation at " + str(self.env.now))
                 break

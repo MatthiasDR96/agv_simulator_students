@@ -1,35 +1,121 @@
-from random import randint
+import ast
+import configparser
+import random
 
 import matplotlib.pyplot as plt
-import numpy as np
 import simpy
 
 from AGV import AGV
 from Astar import Astar
 from FleetManager import FleetManager
+from Logger import Logger
 from MES import MES
 from Node import Node
-from Renderer import Renderer
 
 
-def make_graph():
-    # Make nodes
-    nodes = []
-    for j in range(len(node_locations)):
-        node = Node()
-        node.pos = node_locations[j]
-        node.name = node_names[j]
-        node.neighbors = node_neighbors[j]
-        nodes.append(node)
+class Simulation:
 
-    # Replace neighbor names by node objects
-    for node in nodes:
-        for j in range(len(node.neighbors)):
-            for k in range(len(node_names)):
-                if node_names[k] == node.neighbors[j]:
-                    node.neighbors[j] = nodes[k].copy_node()
+    def __init__(self):
 
-    return nodes
+        # Setup
+        setup = configparser.ConfigParser()
+        setup.read('test_vectors/setup.ini')
+
+        # Set params
+        self.number_of_agvs = int(setup['GENERAL']['number_of_agvs'])  # Number of AGVs in the system
+        self.robot_speed = int(setup['GENERAL']['robot_speed'])  # Robot speed
+        self.task_execution_time = int(setup['GENERAL']['task_execution_time'])  # Execution time of tasks
+        self.node_locations = ast.literal_eval(setup['LAYOUT']['node_locations'])  # List of locations of nodes
+        self.node_neighbors = ast.literal_eval(setup['LAYOUT']['node_neighbors'])  # List of edges between nodes
+        self.node_names = ast.literal_eval(setup['LAYOUT']['node_names'])  # List of node names
+        self.charge_locations = ast.literal_eval(setup['LAYOUT']['charge_locations'])  # List of charging locations
+        self.depot_locations = ast.literal_eval(setup['LAYOUT']['depot_locations'])  # List of depot locations
+        self.order_list = str(setup['ORDERS']['order_list'])  # List of orders for MES to execute
+
+        # Start simulation
+        res = self.start_simulation()
+
+        # Print simulation results
+        duration = open("logfiles/simulation_duration.txt", "w")
+        duration.write(str(res))
+        duration.close()
+        print("Simulation time: " + str(res))
+
+    def print_simulation_info(self):
+
+        print("\nSimulation started\n")
+        print("Amount of AGVs: " + str(self.number_of_agvs))
+        print("All AGVs drive at a constant speed of: " + str(self.robot_speed) + " m/s.")
+        print("AGVs start locations are random chosen.")
+        print("Fleet manager uses a simple random optimizer.")
+        print("AGVs pick the first task from their local taks list and execute the task completely (A and B) before"
+              " starting a new task.")
+
+    def start_simulation(self):
+
+        # Print info
+        self.print_simulation_info()
+
+        # Construct graph
+        graph = self.make_graph()
+
+        # Init Astar
+        astar = Astar(graph)
+
+        # Define simulation environment
+        env = simpy.Environment()
+
+        # Define global task list, global robot list, and list of tasks executing
+        global_task_list = simpy.FilterStore(env)
+        global_robot_list = simpy.FilterStore(env)
+        tasks_executing = simpy.FilterStore(env)
+
+        # Define local_task list for each AGV
+        local_task_lists = [simpy.FilterStore(env) for i in range(self.number_of_agvs)]
+
+        # Define MES
+        mes = MES(env, global_task_list, tasks_executing, self.order_list)
+
+        # Define Fleet Manger
+        FleetManager(env, global_task_list, global_robot_list, local_task_lists, astar)
+
+        # Define AGVs starting at a random location
+        for ID in range(self.number_of_agvs):
+            AGV(env, ID + 1, self.robot_speed, global_task_list, global_robot_list, random.choice(self.depot_locations),
+                local_task_lists[ID], astar, self.task_execution_time, self.charge_locations, tasks_executing)
+
+        # Define renderer
+        # Renderer(env, graph, global_task_list, global_robot_list, local_task_lists, tasks_executing,
+        # self.depot_locations, self.charge_locations)
+
+        # Define logger
+        Logger(env, global_task_list, global_robot_list, local_task_lists, tasks_executing)
+
+        # Run environment
+        env.run(until=mes.main)
+
+        # Return duration of simulation
+        return env.now
+
+    def make_graph(self):
+
+        # Make nodes
+        nodes = []
+        for j in range(len(self.node_locations)):
+            node = Node()
+            node.pos = self.node_locations[j]
+            node.name = self.node_names[j]
+            node.neighbors = self.node_neighbors[j]
+            nodes.append(node)
+
+        # Replace neighbor names by node objects
+        for node in nodes:
+            for j in range(len(node.neighbors)):
+                for k in range(len(self.node_names)):
+                    if self.node_names[k] == node.neighbors[j]:
+                        node.neighbors[j] = nodes[k].copy_node()
+
+        return nodes
 
 
 def print_layout(locations):
@@ -47,87 +133,9 @@ def plot_layout(locations):
         plt.text(node.pos[0], node.pos[1] + 0.1, node.name)
         for neighbor in node.neighbors:
             plt.plot([node.pos[0], neighbor.pos[0]], [node.pos[1], neighbor.pos[1]], 'b-', lw=0.5)
-    plt.draw()
-    plt.pause(1000)
+    plt.show()
 
 
-if __name__ == "__main__":
-
-    # Parameter initialization
-    number_of_agvs = 3
-    robot_speed = 1.0  # m/s
-    collision_threshold = 0.5  # AGV diameter is 1m
-    amount_of_tasks_to_execute = 10
-    max_arrival_interval = 20  # sec
-    task_execution_time = 2  # sec
-
-    # Define graph
-    node_locations = [(10, 20), (10, 40), (10, 60), (20, 0), (20, 20), (20, 40), (20, 60), (20, 80), (30, 0), (30, 20),
-                      (30, 40), (30, 60), (30, 80)]
-    task_locations = np.delete(node_locations, 1, axis=0)  # No tasks at depot location and charging locations
-    depot_locations = node_locations[1]
-    charge_locations = [node_locations[1], node_locations[9]]
-    node_names = ["pos_1", "pos_2", "pos_3", "pos_4", "pos_5", "pos_6", "pos_7", "pos_8", "pos_9", "pos_10", "pos_11",
-                  "pos_12", "pos_13"]
-    node_neighbors = [["pos_5"], ["pos_6"], ["pos_7"], ["pos_5", "pos_9"], ["pos_1", "pos_4", "pos_6"],
-                      ["pos_2", "pos_5", "pos_7", "pos_10", "pos_11", "pos_12"],
-                      ["pos_3", "pos_6", "pos_8"], ["pos_7", "pos_13"], ["pos_4", "pos_10"],
-                      ["pos_6", "pos_9", "pos_11"],
-                      ["pos_6", "pos_10", "pos_12"], ["pos_6", "pos_11", "pos_13"], ["pos_8", "pos_12"]]
-
-    # Print information
-    print("\nSimulation started\n")
-    print("Amount of AGVs: " + str(number_of_agvs))
-    print("All AGVs drive at a constant speed of: " + str(robot_speed) + " m/s.")
-    print("AGVs start locations are random chosen.")
-    print("Fleet manager uses a simple random optimizer.")
-    print("AGVs pick the first task from their local taks list and execute the task completely (A and B) before"
-          " starting a new task.\n")
-
-    # Construct graph
-    graph = make_graph()
-    # print_layout(graph)
-    # plot_layout(graph)
-
-    # Init Astar
-    astar = Astar(graph)
-
-    # Define non-realtime environment
-    env = simpy.Environment()
-
-    ####################################################################################################
-
-    # Define global task list and global robot list
-    global_task_list = simpy.FilterStore(env)
-    global_robot_list = simpy.FilterStore(env)
-    tasks_executing = simpy.FilterStore(env)
-
-    # Define local_task list for each AGV
-    local_task_lists = [simpy.FilterStore(env) for i in range(number_of_agvs)]
-
-    # To overcome strange error
-    for ID in range(number_of_agvs):
-        continue
-
-    ####################################################################################################
-
-    # Define MES
-    mes = MES(env, global_task_list, task_locations, amount_of_tasks_to_execute, max_arrival_interval, tasks_executing)
-
-    # Define Fleet Manger
-    fleet_manager = FleetManager(env, global_task_list, global_robot_list, local_task_lists, astar)
-
-    # Define AGVs starting at a random location
-    AGVs = [AGV(env, ID + 1, robot_speed, global_task_list, global_robot_list,
-                node_locations[randint(0, len(node_locations))],
-                local_task_lists[ID], astar, task_execution_time, charge_locations, tasks_executing) for ID in
-            range(number_of_agvs)]
-
-    # Define renderer
-    renderer = Renderer(env, graph, global_task_list, global_robot_list, local_task_lists, tasks_executing,
-                        depot_locations, charge_locations)
-
-    #####################################################################################################
-
-    # Run environment
-    env.run(until=mes.main)
+if __name__ == '__main__':
+    # Run simulation
+    sim = Simulation()
