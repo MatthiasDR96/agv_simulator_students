@@ -17,7 +17,7 @@ class RendererOffLine:
         # Log files
         self.global_robot_list_logfile = open("../logfiles/global_robot_list.txt", "r")
         self.global_task_list_logfile = open("../logfiles/global_task_list.txt", "r")
-        self.local_task_list_logfile = open("../logfiles/local_task_lists.txt", "r")
+        # self.local_task_list_logfile = open("../logfiles/local_task_lists.txt", "r")
         self.tasks_executing_logfile = open("../logfiles/tasks_executing.txt", "r")
 
         # Setup file
@@ -27,7 +27,7 @@ class RendererOffLine:
         # Attributes
         self.global_robot_list = self.global_robot_list_logfile
         self.global_task_list = self.global_task_list_logfile
-        self.local_task_lists = self.local_task_list_logfile
+        # self.local_task_lists = self.local_task_list_logfile
         self.tasks_executing = self.tasks_executing_logfile
         duration = open("../logfiles/simulation_duration.txt", "r")
         self.simulation_duration = int(duration.readline())
@@ -57,7 +57,7 @@ class RendererOffLine:
         # Close files
         self.global_robot_list_logfile.close()
         self.global_task_list_logfile.close()
-        self.local_task_list_logfile.close()
+        # self.local_task_list_logfile.close()
         self.tasks_executing_logfile.close()
 
     def render_scene(self):
@@ -70,8 +70,8 @@ class RendererOffLine:
             self.global_robot_list = global_robot_list.split('/')[1].split(':')
             global_task_list = self.global_task_list_logfile.readline()
             self.global_task_list = global_task_list.split('/')[1].split(':')
-            local_task_lists = self.local_task_list_logfile.readline()
-            self.local_task_lists = local_task_lists.split('/')[1].split(':')
+            # local_task_lists = self.local_task_list_logfile.readline()
+            # self.local_task_lists = local_task_lists.split('/')[1].split(':')
             tasks_executing = self.tasks_executing_logfile.readline()
             self.tasks_executing = tasks_executing.split('/')[1].split(':')
 
@@ -165,7 +165,7 @@ class RendererOffLine:
 
         # Plot AGVs
         global_robot_list = list(self.global_robot_list)
-        local_task_lists = list(self.local_task_lists)
+        # local_task_lists = list(self.local_task_lists)
         for i in range(len(global_robot_list) - 1):
             robot = global_robot_list[i].split(';')
             color = self.colors[int(robot[0]) - 1]
@@ -187,13 +187,13 @@ class RendererOffLine:
                                  [int(path[k + 1]), int(path[k + 3])], color=color, lw=1.5)
 
             # Plot assigned tasks
-            list_ = local_task_lists[int(robot[0]) - 1].split(',')[1]
-            if not list_ == "[]":
-                list_ = list_[2:-2].split(', ')
-                for i in range(len(list_)):
-                    task = list_[i].split(';')
-                    plt.plot([float(robot[1]), int(task[1])],
-                             [float(robot[2]), int(task[2])], color=color, lw=0.5)
+            # list_ = local_task_lists[int(robot[0]) - 1].split(',')[1]
+            # if not list_ == "[]":
+            # list_ = list_[2:-2].split(', ')
+            # for i in range(len(list_)):
+            # task = list_[i].split(';')
+            # plt.plot([float(robot[1]), int(task[1])],
+            # [float(robot[2]), int(task[2])], color=color, lw=0.5)
 
     def plot_graph(self):
 

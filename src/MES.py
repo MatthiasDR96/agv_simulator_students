@@ -1,14 +1,14 @@
+import Comm as comm
 from Task import Task
 
 
 class MES:
-
-    def __init__(self, env, global_task_list, tasks_executing, order_list):
+    
+    def __init__(self, env, kb, order_list):
 
         # Attributes
         self.env = env  # Environment
-        self.global_task_list = global_task_list  # MES writes new tasks to this list
-        self.tasks_executing = tasks_executing  # Tasks which are still executing (for end criterium)
+        self.kb = kb  # Knowledgebase
         self.order_list = order_list  # List of orders to spawn
 
         # Processes
@@ -41,7 +41,7 @@ class MES:
             new_task = Task(order_number, pos_a, pos_b, priority)
 
             # Put the new task in the global task list
-            self.global_task_list.put(new_task)
+            comm.sql_write(self.kb['global_task_list'], new_task)
             print('MES:              New task ' + new_task.to_string() + ' arrived at ' + str(self.env.now))
 
             # Read order
@@ -54,5 +54,5 @@ class MES:
         # Wait till all tasks are executed
         while True:
             yield self.env.timeout(1)
-            if len(self.tasks_executing.items) == 0 and len(self.global_task_list.items) == 0:
+            if len(self.kb['tasks_executing'].items) == 0 and len(self.kb['global_task_list'].items) == 0:
                 break

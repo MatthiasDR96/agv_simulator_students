@@ -1,11 +1,9 @@
 import ast
 import configparser
-import random
 
 import matplotlib.pyplot as plt
 import simpy
 from AGV import AGV
-from Astar import Astar
 from FleetManager import FleetManager
 from Logger import Logger
 from MES import MES
@@ -24,71 +22,64 @@ class Simulation:
         self.number_of_agvs = int(setup['GENERAL']['number_of_agvs'])  # Number of AGVs in the system
         self.robot_speed = int(setup['GENERAL']['robot_speed'])  # Robot speed
         self.task_execution_time = int(setup['GENERAL']['task_execution_time'])  # Execution time of tasks
+        self.battery_threshold = int(setup['GENERAL']['battery_threshold'])
+        self.max_charging_time = int(setup['GENERAL']['max_charging_time'])
         self.node_locations = ast.literal_eval(setup['LAYOUT']['node_locations'])  # List of locations of nodes
         self.node_neighbors = ast.literal_eval(setup['LAYOUT']['node_neighbors'])  # List of edges between nodes
         self.node_names = ast.literal_eval(setup['LAYOUT']['node_names'])  # List of node names
         self.charge_locations = ast.literal_eval(setup['LAYOUT']['charge_locations'])  # List of charging locations
         self.depot_locations = ast.literal_eval(setup['LAYOUT']['depot_locations'])  # List of depot locations
+        self.start_locations = ast.literal_eval(setup['LAYOUT']['start_locations'])  # List of starting locations
         self.order_list = str(setup['ORDERS']['order_list'])  # List of orders for MES to execute
 
-        # Start simulation
-        res = self.start_simulation()
-
-        # Print simulation results
-        duration = open("../logfiles/simulation_duration.txt", "w")
-        duration.write(str(res))
-        duration.close()
-        print("Simulation time: " + str(res))
-
-    def print_simulation_info(self):
-
-        print("\nSimulation started\n")
-        print("Amount of AGVs: " + str(self.number_of_agvs))
-        print("All AGVs drive at a constant speed of: " + str(self.robot_speed) + " m/s.")
-        print("AGVs start locations are random chosen.")
-        print("Fleet manager uses a simple random optimizer.")
-        print("AGVs pick the first task from their local taks list and execute the task completely (A and B) before"
-              " starting a new task.")
+        # Check corectness of setup
+        if not self.number_of_agvs <= len(self.start_locations):
+            print("Simulation setup not correct")
+            exit()
+        else:
+            # Start simulation
+            res = self.start_simulation()
+    
+            # Print simulation results
+            with open("../logfiles/simulation_duration.txt", "w") as duration:
+                duration.write(str(res))
+            print("Simulation time: " + str(res))
 
     def start_simulation(self):
 
         # Print info
         self.print_simulation_info()
 
-        # Construct graph
-        graph = self.make_graph()
-
-        # Init Astar
-        astar = Astar(graph)
-
         # Define simulation environment
         env = simpy.Environment()
 
-        # Define global task list, global robot list, and list of tasks executing
-        global_task_list = simpy.FilterStore(env)
-        global_robot_list = simpy.FilterStore(env)
-        tasks_executing = simpy.FilterStore(env)
+        # Define knowledge base
+        kb = self.define_knowledge_base(env)
 
-        # Define local_task list for each AGV
-        local_task_lists = [simpy.FilterStore(env) for i in range(self.number_of_agvs)]
-
+        # Define communication channel between FleetManager and AGVs
+        agv_fm_comm = dict()
+        for i in range(self.number_of_agvs):
+            agv_fm_comm[i + 1] = simpy.FilterStore(env)
+        print(agv_fm_comm)
+        
         # Define MES
-        mes = MES(env, global_task_list, tasks_executing, self.order_list)
+        mes = MES(env, kb, self.order_list)
 
         # Define Fleet Manger
-        FleetManager(env, global_task_list, global_robot_list, local_task_lists, astar)
+        FleetManager(env, kb, agv_fm_comm)
 
-        # Define AGVs starting at a random location
+        # Define AGVs
         for ID in range(self.number_of_agvs):
-            AGV(env, ID + 1, self.robot_speed, global_task_list, global_robot_list, random.choice(self.depot_locations),
-                local_task_lists[ID], astar, self.task_execution_time, self.charge_locations, tasks_executing)
-
-        # Define renderer
-        # Renderer(env, graph, global_task_list, global_robot_list, local_task_lists, tasks_executing,
-        # self.depot_locations, self.charge_locations)
+            agv_params = {'ID': ID + 1, 'robot_speed': self.robot_speed,
+                          'task_execution_time': self.task_execution_time, 'start_location': self.start_locations[ID],
+                          'battery_threshold': self.battery_threshold, 'max_charging_time': self.max_charging_time}
+            AGV(env, agv_params, kb, agv_fm_comm[ID + 1])
 
         # Define logger
-        Logger(env, global_task_list, global_robot_list, local_task_lists, tasks_executing)
+        Logger(env, kb)
+
+        # Define online renderer
+        # RendererOnline(env, kb, self.depot_locations, self.charge_locations)
 
         # Run environment
         env.run(until=mes.main)
@@ -96,6 +87,16 @@ class Simulation:
         # Return duration of simulation
         return env.now
 
+    def print_simulation_info(self):
+    
+        print("\nSimulation started\n")
+        print("Amount of AGVs: " + str(self.number_of_agvs))
+        print("All AGVs drive at a constant speed of: " + str(self.robot_speed) + " m/s.")
+        print("AGVs start locations are random chosen.")
+        print("Fleet manager uses a simple random optimizer.")
+        print("AGVs pick the first task from their local taks list and execute the task completely (A and B) before"
+              " starting a new task.")
+        
     def make_graph(self):
 
         # Make nodes
@@ -115,6 +116,19 @@ class Simulation:
                         node.neighbors[j] = nodes[k].copy_node()
 
         return nodes
+
+    def define_knowledge_base(self, env):
+        global_task_list = simpy.FilterStore(env)
+        global_robot_list = simpy.FilterStore(env)
+        tasks_executing = simpy.FilterStore(env)
+        graph = self.make_graph()
+        kb = dict()
+        kb['global_task_list'] = global_task_list
+        kb['global_robot_list'] = global_robot_list
+        kb['tasks_executing'] = tasks_executing
+        kb['charge_locations'] = self.charge_locations
+        kb['graph'] = graph
+        return kb
 
 
 def print_layout(locations):

@@ -1,19 +1,20 @@
 import math
 
+import Comm as comm
 import numpy as np
+from Astar import Astar
 from ortools.sat.python import cp_model
 
 
 class FleetManager:
-
-    def __init__(self, env, global_task_list, global_robot_list, local_task_lists, astar):
+    
+    def __init__(self, env, kb, agv_fm_comm):
 
         # Attributes
         self.env = env
-        self.global_task_list = global_task_list  # Fleet manager uses this list as start to assign tasks
-        self.global_robot_list = global_robot_list  # Fleet manager uses this list to obtain AGV information
-        self.local_task_lists = local_task_lists  # Fleet manager uses this list to send the assignments to the AGVs
-        self.astar = astar  # Astar shortest path finder
+        self.kb = kb
+        self.agv_fm_comm = agv_fm_comm
+        self.astar = Astar(self.kb['graph'])  # Astar shortest path finder
         self.fitness_file = open("../logfiles/fitness_values.txt", "w")
 
         # Process
@@ -31,34 +32,43 @@ class FleetManager:
             yield self.env.timeout(1)  # Sample time
 
             # Define current status
-            robots, tasks, cost_matrix = self.define_current_status()
+            available_robots, tasks_to_execute, cost_matrix = self.define_current_status()
             # print('FleetManager:     Task list at ' + str(self.env.now) + ': ' + str(
-            # [task.to_string() for task in tasks]))
+            # [task.to_string() for task in tasks_to_execute]))
             # print('FleetManager:     Robot list at ' + str(self.env.now) + ': ' + str(
-            # [robot.to_string() for robot in robots]))
+            # [robot.to_string() for robot in available_robots]))
 
-            # If there are robots and tasks
-            if not len(tasks) == 0 and not len(robots) == 0:
+            # If there are robots available and tasks to execute
+            if not len(tasks_to_execute) == 0 and not len(available_robots) == 0:
 
                 # Optimization
-                fitness, solution = optimization(len(robots), len(tasks), cost_matrix)
+                fitness, solution = optimization(len(available_robots), len(tasks_to_execute), cost_matrix)
 
                 # Log fitness values for each assignment
                 self.fitness_file.write(str(self.env.now) + "," + str(fitness) + ",\n")
 
-                # Clear previous assignment
-                for task_list in self.local_task_lists:
-                    length = len(task_list.items)
-                    for i in range(length):
-                        task_list.get()
-
-                # Send tasks to AGVs
-                for i in range(len(robots)):
-                    for j in range(len(tasks)):
+                # Assign tasks to AGV task lists
+                execution_list = dict()
+                for i in range(len(available_robots)):
+    
+                    # Make list of assigned tasks for the robot
+                    assigned_tasks = []
+                    for j in range(len(tasks_to_execute)):
                         if solution[i][j] == 1:
-                            self.local_task_lists[robots[i].ID - 1].put(tasks[j])
+                            assigned_tasks.append(tasks_to_execute[j])
                             # print("FleetManager:     Assigned task " + str(tasks[j].order_number) +" to AGV " +
                             # str(robots[i].ID) + " at " + str(self.env.now))
+    
+                    # Pick the task closest to the robot
+                    robot_pos = available_robots[i].position
+                    chosen_task = sorted(assigned_tasks, key=lambda task: self.get_first_task(task, robot_pos))
+                    if chosen_task:
+                        execution_list[available_robots[i].ID] = chosen_task[0]  # Pick first task (closest)
+
+                # Send tasks to AGVs
+                for k, v in execution_list.items():
+                    comm.tcp_write(self.agv_fm_comm[k], v)
+                    
             else:
                 # Log fitness values for no assignment (0.0)
                 self.fitness_file.write(str(self.env.now) + "," + str(0.0) + ",\n")
@@ -66,17 +76,17 @@ class FleetManager:
     def define_current_status(self):
 
         # Copy robot list
-        robots = np.copy(self.global_robot_list.items)
+        robots = np.copy(comm.sql_read(self.kb['global_robot_list']))
         robots = sorted(robots, key=lambda robot_: robot_.ID)
 
-        # Remove robots which are charging or have troubles
+        # Remove robots which are not idle
         robots_ = []
         for robot in robots:
-            if not robot.status == 'EMPTY' and not robot.status == 'CHARGING':
+            if robot.status == 'IDLE':
                 robots_.append(robot)
 
         # Copy global task list
-        tasks = np.copy(self.global_task_list.items)
+        tasks = np.copy(comm.sql_read(self.kb['global_task_list']))
         number_robots = len(robots_)
         number_tasks = len(tasks)
 
@@ -88,7 +98,13 @@ class FleetManager:
                 distance_ab, _ = self.astar.find_shortest_path(tasks[j].pos_A, tasks[j].pos_B)
                 cost_matrix[i, j] = (distance_ra + distance_ab)
         return robots_, tasks, cost_matrix
-
+    
+    def get_first_task(self, task, robot_pos):
+        distance, _ = self.astar.find_shortest_path(task.pos_A, robot_pos)
+        priority = task.priority
+        result = distance * priority
+        return result
+    
 
 def calculate_euclidean_distance(a, b):
     return math.sqrt(math.pow((b[0] - a[0]), 2) + math.pow((b[1] - a[1]), 2))

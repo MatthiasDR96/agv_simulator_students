@@ -5,24 +5,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-class Renderer:
-
-    def __init__(self, env, locations, global_task_list, global_robot_list, local_task_lists, tasks_executing,
-                 depot_locations, charge_locations):
+class RendererOnline:
+    
+    def __init__(self, env, kb, depot_locations, charge_locations):
 
         # Attributes
         self.env = env
-        self.locations = locations
-        self.global_robot_list = global_robot_list
-        self.global_task_list = global_task_list
-        self.local_task_lists = local_task_lists
-        self.status_monitor = [[] for robot in global_robot_list.items]
-        self.battery_status_monitor = [[] for robot in global_robot_list.items]
-        self.tasks_executing = tasks_executing
+        self.locations = kb['graph']
+        self.global_robot_list = kb['global_robot_list']
+        self.global_task_list = kb['global_task_list']
+        self.status_monitor = [[] for robot in kb['global_robot_list'].items]
+        self.battery_status_monitor = [[] for robot in kb['global_robot_list'].items]
+        self.tasks_executing = kb['tasks_executing']
         self.depot_locations = depot_locations
         self.charge_locations = charge_locations
         self.tasks_not_executing_monitor = []
-        self.colors = matplotlib.cm.rainbow(np.linspace(0, 1, len(global_robot_list.items)))
+        self.colors = matplotlib.cm.rainbow(np.linspace(0, 1, len(kb['global_robot_list'].items)))
 
         # Processes
         self.render_scene = self.env.process(self.render_scene())
@@ -78,10 +76,10 @@ class Renderer:
                                      [robot.path[i].pos[1], robot.path[i + 1].pos[1]], color=color, lw=1.5)
 
                 # Plot assigned tasks
-                list = self.local_task_lists[robot.ID - 1]
-                for item in list.items:
-                    plt.plot([robot.position[0], item.pos_A[0]],
-                             [robot.position[1], item.pos_A[1]], color=color, lw=0.5)
+                # list = self.local_task_lists[robot.ID - 1]
+                # for item in list.items:
+                # plt.plot([robot.position[0], item.pos_A[0]],
+                # [robot.position[1], item.pos_A[1]], color=color, lw=0.5)
 
             # Plot tasks not executing
             for task in self.global_task_list.items:
@@ -137,20 +135,20 @@ class Renderer:
                 plt.ylim(0, 100)
                 plt.plot(battery_status_monitor_x, battery_status_monitor_y, 'b')
                 plt.plot(battery_status_monitor_x, np.repeat(20, len(battery_status_monitor_x)), 'r')
-
-    def tasks_not_executing_monitor_update(self):
-
-        while True:
-            yield self.env.timeout(1)
-            tasks_not_executing = np.sum(
-                [len(self.local_task_lists[i].items) for i in range(len(self.global_robot_list.items))])
-            self.tasks_not_executing_monitor.append(tasks_not_executing)
-            monitor_tasks_not_executing_y = self.tasks_not_executing_monitor
-            monitor_tasks_not_executing_x = np.arange(len(monitor_tasks_not_executing_y))
-            plt.figure(3)
-            plt.title("Tasks not executing")
-            plt.ylabel("Amount of tasks not executing")
-            plt.xlabel("Simulation time (s)")
-            plt.plot(monitor_tasks_not_executing_x, monitor_tasks_not_executing_y)
-            plt.draw()
-            plt.pause(0.0001)
+    
+    # def tasks_not_executing_monitor_update(self):
+    
+    # while True:
+    # yield self.env.timeout(1)
+    # tasks_not_executing = np.sum(
+    # [len(self.local_task_lists[i].items) for i in range(len(self.global_robot_list.items))])
+    # self.tasks_not_executing_monitor.append(tasks_not_executing)
+    # monitor_tasks_not_executing_y = self.tasks_not_executing_monitor
+    # monitor_tasks_not_executing_x = np.arange(len(monitor_tasks_not_executing_y))
+    # plt.figure(3)
+    # plt.title("Tasks not executing")
+    # plt.ylabel("Amount of tasks not executing")
+    # plt.xlabel("Simulation time (s)")
+    # plt.plot(monitor_tasks_not_executing_x, monitor_tasks_not_executing_y)
+    # plt.draw()
+    #plt.pause(0.0001)
