@@ -1,9 +1,10 @@
 import math
 
-import Comm as comm
 import numpy as np
-from Astar import Astar
 from ortools.sat.python import cp_model
+
+import Comm as comm
+from Astar import Astar
 
 
 class FleetManager:
@@ -33,6 +34,8 @@ class FleetManager:
 
             # Define current status
             available_robots, tasks_to_execute, cost_matrix = self.define_current_status()
+            # print("Fleet manager:    Available robots: " + str(len(available_robots)) + ", Tasks to execute: "
+            # + str(len(tasks_to_execute)) + " at " + str(self.env.now))
             # print('FleetManager:     Task list at ' + str(self.env.now) + ': ' + str(
             # [task.to_string() for task in tasks_to_execute]))
             # print('FleetManager:     Robot list at ' + str(self.env.now) + ': ' + str(

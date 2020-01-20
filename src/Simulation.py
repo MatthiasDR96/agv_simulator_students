@@ -3,21 +3,21 @@ import configparser
 
 import matplotlib.pyplot as plt
 import simpy
+
 from AGV import AGV
 from FleetManager import FleetManager
-from Logger import Logger
 from MES import MES
 from Node import Node
 
 
 class Simulation:
-
+    
     def __init__(self):
-
+        
         # Setup
         setup = configparser.ConfigParser()
         setup.read('../test_vectors/setup.ini')
-
+        
         # Set params
         self.number_of_agvs = int(setup['GENERAL']['number_of_agvs'])  # Number of AGVs in the system
         self.robot_speed = int(setup['GENERAL']['robot_speed'])  # Robot speed
@@ -31,74 +31,73 @@ class Simulation:
         self.depot_locations = ast.literal_eval(setup['LAYOUT']['depot_locations'])  # List of depot locations
         self.start_locations = ast.literal_eval(setup['LAYOUT']['start_locations'])  # List of starting locations
         self.order_list = str(setup['ORDERS']['order_list'])  # List of orders for MES to execute
-
-        # Check corectness of setup
+        
+        # Check correctness of setup
         if not self.number_of_agvs <= len(self.start_locations):
             print("Simulation setup not correct")
             exit()
         else:
             # Start simulation
             res = self.start_simulation()
-    
+
             # Print simulation results
             with open("../logfiles/simulation_duration.txt", "w") as duration:
                 duration.write(str(res))
             print("Simulation time: " + str(res))
-
+    
     def start_simulation(self):
-
+        
         # Print info
         self.print_simulation_info()
-
+        
         # Define simulation environment
         env = simpy.Environment()
-
+        
         # Define knowledge base
         kb = self.define_knowledge_base(env)
-
+        
         # Define communication channel between FleetManager and AGVs
         agv_fm_comm = dict()
-        for i in range(self.number_of_agvs):
-            agv_fm_comm[i + 1] = simpy.FilterStore(env)
-        print(agv_fm_comm)
+        [agv_fm_comm.update({i + 1: simpy.FilterStore(env)}) for i in range(self.number_of_agvs)]
         
         # Define MES
         mes = MES(env, kb, self.order_list)
-
+        
         # Define Fleet Manger
         FleetManager(env, kb, agv_fm_comm)
-
+        
         # Define AGVs
         for ID in range(self.number_of_agvs):
-            agv_params = {'ID': ID + 1, 'robot_speed': self.robot_speed,
-                          'task_execution_time': self.task_execution_time, 'start_location': self.start_locations[ID],
-                          'battery_threshold': self.battery_threshold, 'max_charging_time': self.max_charging_time}
+            agv_params = {'ID': ID + 1,
+                          'robot_speed': self.robot_speed,
+                          'task_execution_time': self.task_execution_time,
+                          'start_location': self.start_locations[ID],
+                          'battery_threshold': self.battery_threshold,
+                          'max_charging_time': self.max_charging_time}
             AGV(env, agv_params, kb, agv_fm_comm[ID + 1])
-
+        
         # Define logger
-        Logger(env, kb)
-
+        # Logger(env, kb)
+        
         # Define online renderer
         # RendererOnline(env, kb, self.depot_locations, self.charge_locations)
-
+        
         # Run environment
         env.run(until=mes.main)
-
+        
         # Return duration of simulation
         return env.now
-
-    def print_simulation_info(self):
     
+    def print_simulation_info(self):
+        
         print("\nSimulation started\n")
         print("Amount of AGVs: " + str(self.number_of_agvs))
         print("All AGVs drive at a constant speed of: " + str(self.robot_speed) + " m/s.")
-        print("AGVs start locations are random chosen.")
-        print("Fleet manager uses a simple random optimizer.")
-        print("AGVs pick the first task from their local taks list and execute the task completely (A and B) before"
-              " starting a new task.")
-        
+        print("AGVs start locations are fixed.")
+        print("Fleet manager uses a linear programming optimizer.")
+    
     def make_graph(self):
-
+    
         # Make nodes
         nodes = []
         for j in range(len(self.node_locations)):
@@ -107,16 +106,16 @@ class Simulation:
             node.name = self.node_names[j]
             node.neighbors = self.node_neighbors[j]
             nodes.append(node)
-
+    
         # Replace neighbor names by node objects
         for node in nodes:
             for j in range(len(node.neighbors)):
                 for k in range(len(self.node_names)):
                     if self.node_names[k] == node.neighbors[j]:
                         node.neighbors[j] = nodes[k].copy_node()
-
+    
         return nodes
-
+    
     def define_knowledge_base(self, env):
         global_task_list = simpy.FilterStore(env)
         global_robot_list = simpy.FilterStore(env)

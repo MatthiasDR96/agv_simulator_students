@@ -47,7 +47,7 @@ class AGV:
         while True:
     
             # Wait for an assigned task
-            print("AGV " + str(self.ID) + ":            Waiting for tasks")
+            print("AGV " + str(self.ID) + ":            Waiting for tasks...")
             task = yield self.agv_fm_comm.get()
     
             # Execute task
