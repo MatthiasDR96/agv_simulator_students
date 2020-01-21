@@ -2,7 +2,10 @@ import math
 
 
 class Astar:
-
+    """
+        A class containing the Astar path planner
+    """
+    
     def __init__(self, graph):
         self.graph = graph
 
@@ -39,7 +42,6 @@ class Astar:
         while openset:
             current = min(openset, key=lambda o: o.g + o.h)
             if (current.pos[0], current.pos[1]) == (end_node.pos[0], end_node.pos[1]):
-                # print("Goal reached")
                 path = []
                 while current.parent:
                     path.append(current)

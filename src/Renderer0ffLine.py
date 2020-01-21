@@ -5,13 +5,18 @@ import math
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+
 from Node import Node
 
 plt.ion()
 
 
 class RendererOffLine:
-
+    """
+            A class containing the methods for offline rendering after a simulation. The logged info from the
+            logfiles are used to render the simulation.
+    """
+    
     def __init__(self):
 
         # Log files
@@ -104,9 +109,6 @@ class RendererOffLine:
             plt.pause(0.0001)
             plt.clf()
             plt.tight_layout()
-
-            # Sleep
-            # time.sleep(0.05)
 
     def plot_status(self):
         global_robot_list = list(self.global_robot_list)

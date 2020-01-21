@@ -11,6 +11,9 @@ from Node import Node
 
 
 class Simulation:
+    """
+            This is the baseclass for the simulation, the whole simulation is set up and started from here.
+    """
     
     def __init__(self):
         

@@ -1,5 +1,8 @@
 class Task:
-
+    """
+            A class containing the Task representation
+    """
+    
     def __init__(self, order_number, pos_a, pos_b, priority):
 
         self.order_number = order_number

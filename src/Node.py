@@ -2,7 +2,10 @@ import math
 
 
 class Node:
-
+    """
+            A class containing the Node representation
+    """
+    
     def __init__(self):
         self.pos = (0, 0)
         self.neighbors = None

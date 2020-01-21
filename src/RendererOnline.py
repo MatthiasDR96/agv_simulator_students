@@ -6,6 +6,9 @@ import numpy as np
 
 
 class RendererOnline:
+    """
+            A class containing the methods for an online rendering of the simulation during runtime.
+    """
     
     def __init__(self, env, kb, depot_locations, charge_locations):
 

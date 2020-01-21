@@ -6,26 +6,32 @@ from Robot import Robot
 
 
 class AGV:
+    """
+        A class containing the intelligence of the AGV agent
+    """
     
     def __init__(self, env, agv_params, kb, agv_fm_comm):
 
         # Attributes
         self.env = env
 
+        # Communication attributes
         self.kb = kb
         self.agv_fm_comm = agv_fm_comm
 
+        # AGV attributes
         self.ID = agv_params['ID']  # Each AGV has an unique ID number
         self.robot_speed = agv_params['robot_speed']  # Constant robot speed
         self.task_execution_time = agv_params['task_execution_time']
         self.robot_location = agv_params['start_location']  # Current AGV location
-        self.battery_threshold = agv_params[
-            'battery_threshold']  # Percentage of battery status when the AGV needs to charge
+        self.battery_threshold = agv_params['battery_threshold']  # Battery threshold when the AGV needs to charge
         self.max_charging_time = agv_params['max_charging_time']  # One hour to charge fully
 
+        # Layout attributes
         self.charging_stations = kb['charge_locations']
         self.astar = Astar(self.kb['graph'])  # Astar shortest path planner
-        
+
+        # Updated attributes
         self.heading_direction = 0  # Direction towards which the AGV is driving
         self.path = []  # Current path to execute
 
@@ -84,32 +90,37 @@ class AGV:
             # If battery threshold exceeded, go to closest charging station and charge fully
             if self.status == 'EMPTY':
                 yield self.env.process(self.charge())
-    
+
+            # Set status to IDLE when task is done or when done charging
             self.status = 'IDLE'
             self.update_robot_status()
 
     def charge(self):
-
-        # Search for closest charging station and go to that station
+    
+        # Search for closest charging station
         self.status = 'CHARGING'
         self.update_robot_status()
         print("AGV " + str(self.ID) + ":            Goes to closest charging station at " + str(self.env.now))
         closest_charging_station = self.search_closest_charging_station()
-
+    
+        # Go to the charging station
         yield self.env.process(self.execute_path(closest_charging_station))
-
-        # Compute amount to charge and charge
+    
+        # Compute amount to charge
         tmp_scale = 0.01
         amount_to_charge = 100 - self.battery_status
         charge_time = ((self.max_charging_time * amount_to_charge) / 100) * tmp_scale
         print("AGV " + str(self.ID) + ":            Is charging for " + str(charge_time) + " seconds at " + str(
             self.env.now))
+    
+        # Charge
         yield self.env.timeout(charge_time)
         self.battery_status = 100
         self.status = 'IDLE'
         self.update_robot_status()
 
     def execute_path(self, goal_position):
+    
         # Compute astar path
         start_position = (int(self.robot_location[0]), int(self.robot_location[1]))
         distance, path = self.astar.find_shortest_path(start_position, goal_position)
@@ -145,8 +156,12 @@ class AGV:
         self.update_robot_status()
 
     def move(self, x, y, travel_time):
+    
+        # Compute heading direction
         self.heading_direction = math.atan2((y - self.robot_location[1]), (x - self.robot_location[0]))
         self.update_robot_status()
+    
+        # Move
         yield self.env.timeout(travel_time)
         self.battery_status = round((self.battery_status - compute_charge_loss(travel_time)), 2)
         self.robot_location = (x, y)
@@ -159,7 +174,7 @@ class AGV:
 
     def status_manager(self):
         while True:
-            yield self.env.timeout(0.01)
+            yield self.env.timeout(0.01)  # Sample time
             if not self.status == 'CHARGING':
                 if self.battery_status < self.battery_threshold:
                     self.status = 'EMPTY'
@@ -182,7 +197,6 @@ class AGV:
 
     def terminate_task(self, order_number):
         comm.sql_remove(self.kb['global_task_list'], order_number)
-        # print("AGV " + str(self.ID) + ":            terminated task with order number: " + str(order_number))
 
 
 def calculate_euclidean_distance(a, b):

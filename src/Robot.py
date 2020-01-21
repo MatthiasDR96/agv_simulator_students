@@ -1,5 +1,8 @@
 class Robot:
-
+    """
+            A class containing the Robot representation
+    """
+    
     def __init__(self, id_number, position, heading_direction=0, path=None, status='IDLE', battery_status=100):
         self.ID = id_number
         self.position = position

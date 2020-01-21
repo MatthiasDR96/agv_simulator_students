@@ -2,6 +2,10 @@ from random import *
 
 import numpy as np
 
+"""
+        Script to generate an orders.txt file used as an input to the simulation
+"""
+
 # Init params
 amount_of_tasks_to_execute = 30
 max_arrival_interval = 20  # sec

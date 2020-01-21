@@ -8,6 +8,9 @@ from Astar import Astar
 
 
 class FleetManager:
+    """
+            A class containing the intelligence of the Fleetmanager agent
+    """
     
     def __init__(self, env, kb, agv_fm_comm):
 
@@ -136,6 +139,7 @@ def optimization(number_robots, number_tasks, distance_matrix):
     solver = cp_model.CpSolver()
     status = solver.Solve(model)
 
+    # Reformat solution
     best_solution = []
     if status == cp_model.OPTIMAL:
         for i in range(number_robots):

@@ -3,6 +3,9 @@ from Task import Task
 
 
 class MES:
+    """
+            A class containing the intelligence of the MES agent
+    """
     
     def __init__(self, env, kb, order_list):
 

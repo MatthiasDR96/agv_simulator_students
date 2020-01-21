@@ -5,7 +5,11 @@ import numpy as np
 
 
 class SimulationAnalyzer:
-
+    """
+            A class containing the methods to run an analysis of the simulation after the simulation ended.
+            It uses the logged data from the logsiles.
+    """
+    
     def __init__(self):
 
         # Setup file
@@ -15,7 +19,7 @@ class SimulationAnalyzer:
         # Logfiles
         self.tasks_executing_logfile = open("../logfiles/tasks_executing.txt", "r")
         self.global_robot_list_logfile = open("../logfiles/global_robot_list.txt", "r")
-        self.local_task_list_logfile = open("../logfiles/local_task_lists.txt", "r")
+        # self.local_task_list_logfile = open("../logfiles/local_task_lists.txt", "r")
 
         # Simulation params
         self.number_of_agvs = int(setup['GENERAL']['number_of_agvs'])
@@ -32,7 +36,7 @@ class SimulationAnalyzer:
         self.agv_status_analyzer()
 
         # Close log files
-        self.local_task_list_logfile.close()
+        # self.local_task_list_logfile.close()
         self.tasks_executing_logfile.close()
         self.global_robot_list_logfile.close()
 
@@ -66,7 +70,6 @@ class SimulationAnalyzer:
 
         # Plot data
         plt.figure(1)
-        plt.legend(['BUSY', 'CHARGING', 'IDLE'])
         time = np.linspace(1, self.simulation_duration, self.simulation_duration)
         for k in range(self.number_of_agvs):
             plt.subplot(self.number_of_agvs, 1, k + 1)
@@ -77,6 +80,7 @@ class SimulationAnalyzer:
             plt.plot(time, self.agv_idle[k])
         plt.xlabel("Simulation time")
         plt.subplots_adjust(wspace=1.5, hspace=0.4)
+        plt.legend(['BUSY', 'CHARGING', 'IDLE'])
         plt.show()
 
         # Print results

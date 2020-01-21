@@ -1,0 +1,1 @@
+This library contains a simulation setup for an AGV system of an infinite amount of AGVs in a predefined layout.
