@@ -1,7 +1,7 @@
 class MotionPlanning:
+    """
+            A class containing the intelligence of the Motion Planning agent
+    """
     
-    def __init__(self):
-        self.a = None
-    
-    def compute_dmas(self, optimized_tour):
-        return None
+    def __init__(self, agv):
+        self.agv = agv

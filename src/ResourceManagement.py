@@ -1,28 +1,41 @@
 class ResourceManagement:
+    """
+            A class containing the intelligence of the Resource Management agent
+    """
     
-    def __init__(self):
-        self.a = None
+    def __init__(self, agv):
+        self.agv = agv
     
-    def compute_optimal_insertion(self, optimized_tour):
-        return None
-    
-    def charge(self):
+    def charge_classic(self):
         # Search for closest charging station
-        self.status = 'CHARGING'
-        print("AGV " + str(self.ID) + ":      Goes to closest charging station at " + str(self.env.now))
+        self.agv.status = 'CHARGING'
+        print("AGV " + str(self.agv.ID) + ":      Goes to closest charging station at " + str(self.agv.env.now))
         closest_charging_station = self.search_closest_charging_station()
         
         # Go to the charging station
-        yield self.env.process(self.execute_path(closest_charging_station))
+        yield self.agv.env.process(self.agv.execute_path(closest_charging_station))
         
         # Compute amount to charge
         tmp_scale = 0.01
-        amount_to_charge = 100 - self.battery_status
-        charge_time = ((self.max_charging_time * amount_to_charge) / 100) * tmp_scale
-        print("AGV " + str(self.ID) + ":      Is charging for " + str(charge_time) + " seconds at " + str(
-            self.env.now))
+        amount_to_charge = 100 - self.agv.battery_status
+        charge_time = ((self.agv.max_charging_time * amount_to_charge) / 100) * tmp_scale
+        print("AGV " + str(self.agv.ID) + ":      Is charging for " + str(charge_time) + " seconds at " + str(
+            self.agv.env.now))
         
         # Charge
-        yield self.env.timeout(charge_time)
-        self.battery_status = 100
-        self.status = 'IDLE'
+        yield self.agv.env.timeout(charge_time)
+        self.agv.battery_status = 100
+        self.agv.status = 'IDLE'
+    
+    def compute_optimal_insertion(self):
+        pass
+    
+    def search_closest_charging_station(self):
+        closest_point = None
+        min_distance = 1000
+        for position in self.agv.charging_stations:
+            distance, _ = self.agv.astar.find_shortest_path(position, self.agv.robot_location)
+            if distance < min_distance:
+                min_distance = distance
+                closest_point = position
+        return closest_point

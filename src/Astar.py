@@ -10,7 +10,7 @@ class Astar:
         self.graph = graph
 
     def find_shortest_path(self, start_pos, end_pos):
-
+    
         # Get nodes from locations
         start_node = None
         end_node = None
@@ -23,15 +23,15 @@ class Astar:
             start_node = self.search_closest_node(start_pos)
         if not end_node:
             end_node = self.search_closest_node(end_pos)
-
+    
         # Compute path
         path = self.astar_search(start_node, end_node)
-
+    
         # Calculate total distance
         distance = 0
         for i in range(len(path) - 1):
             distance += calculate_euclidean_distance(path[i].pos, path[i + 1].pos)
-
+    
         return distance, path
 
     def astar_search(self, start_node, end_node):

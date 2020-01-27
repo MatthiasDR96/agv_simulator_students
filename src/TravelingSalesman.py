@@ -6,6 +6,9 @@ from ortools.constraint_solver import routing_enums_pb2
 
 
 class TravelingSalesman:
+    """
+            A class containing the Traveling Salesman Optimization
+    """
     
     def __init__(self, astar):
         self.astar = astar

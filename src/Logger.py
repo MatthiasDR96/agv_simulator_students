@@ -3,7 +3,7 @@ import logging.handlers
 
 import numpy as np
 
-import Comm as comm
+from Comm import Comm
 
 
 class Logger:
@@ -12,11 +12,12 @@ class Logger:
     """
     
     def __init__(self, env, kb):
-
+    
         # Attributes
         self.env = env
         self.kb = kb
-    
+        self.comm = Comm()
+        
         # Process
         self.logging = self.env.process(self.logging())
 
@@ -60,31 +61,31 @@ class Logger:
         while True:
     
             yield self.env.timeout(1)  # Sample time
-
+    
             # Global tasks list
             global_task_list_string = ""
-            global_task_list = comm.sql_read(self.kb['global_task_list'])
+            global_task_list = self.comm.sql_read(self.kb['global_task_list'])
             for task in global_task_list:
                 global_task_list_string += task.to_log() + ":"
-
+    
             # Local task lists
             local_task_list_string = ""
             for key in self.kb.keys():
                 if "local_task_list_R" in key:
                     local_task_list_string += str(key[-1]) + ";"
-                    local_task_list = comm.sql_read(self.kb[key])
+                    local_task_list = self.comm.sql_read(self.kb[key])
                     for task in local_task_list:
                         local_task_list_string += str(task.to_log()) + ":"
-
+    
             # Task executing
             tasks_executing_string = ""
-            tasks_executing = comm.sql_read(self.kb['tasks_executing'])
+            tasks_executing = self.comm.sql_read(self.kb['tasks_executing'])
             for task in tasks_executing:
                 tasks_executing_string += task.to_log() + ":"
-
+    
             # Global robot list
             global_robot_list_string = ""
-            global_robot_list = comm.sql_read(self.kb['global_robot_list'])
+            global_robot_list = self.comm.sql_read(self.kb['global_robot_list'])
             robots = np.copy(global_robot_list)
             robots = sorted(robots, key=lambda robot_: robot_.ID)
             for robot in robots:

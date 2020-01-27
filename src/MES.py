@@ -1,4 +1,4 @@
-import Comm as comm
+from Comm import Comm
 from Task import Task
 
 
@@ -8,23 +8,24 @@ class MES:
     """
     
     def __init__(self, env, kb, order_list):
-
+    
         # Attributes
         self.env = env  # Environment
-        self.kb = kb  # Knowledgebase
+        self.kb = kb  # Knowledge base
         self.order_list = order_list  # List of orders to spawn
-
+        self.comm = Comm()
+        
         # Processes
         self.main = self.env.process(self.main())
-
+    
         # Initialize
         print("\nMES:                     Started")
 
     def main(self):
-
+    
         # Open file
         file = open(self.order_list, "r")
-
+    
         # Read order
         line = file.readline()
         order = line.split(',')
@@ -44,31 +45,35 @@ class MES:
             new_task = Task(order_number, pos_a, pos_b, priority)
 
             # Put the new task in the global task list
-            comm.sql_write(self.kb['global_task_list'], new_task)
+            self.comm.sql_write(self.kb['global_task_list'], new_task)
             print('MES: New task ' + new_task.to_string() + ' arrived at ' + str(self.env.now))
 
             # Read order
             line = file.readline()
             order = line.split(',')
-
+    
         # Close file
         file.close()
-
+    
         # Wait till all tasks are executed
         while True:
     
             # Sample time
             yield self.env.timeout(1)
     
-            # Check amount of local tasks
+            # Check amount of tasks in local task list
             amount_of_tasks_in_local_task_lists = 0
             for key in self.kb.keys():
                 if 'local_task_list_R' in key:
                     amount_of_tasks_in_local_task_lists += len(self.kb[key].items)
     
-            # Check amount of executing tasks
+            # Check amount of tasks in executing task list
             amount_of_executing_tasks = len(self.kb['tasks_executing'].items)
     
+            # Check amount af tasks in global task list
+            amount_of_global_tasks = len(self.kb['global_task_list'].items)
+            
             # End criterium
-            if amount_of_executing_tasks == 0 and amount_of_tasks_in_local_task_lists == 0:
+            if amount_of_executing_tasks == 0 and amount_of_tasks_in_local_task_lists == 0 \
+                    and amount_of_global_tasks == 0:
                 break

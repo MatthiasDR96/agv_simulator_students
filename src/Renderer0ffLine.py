@@ -18,17 +18,17 @@ class RendererOffLine:
     """
     
     def __init__(self):
-
+    
         # Log files
         self.global_robot_list_logfile = open("../logfiles/global_robot_list.txt", "r")
         self.global_task_list_logfile = open("../logfiles/global_task_list.txt", "r")
         self.local_task_list_logfile = open("../logfiles/local_task_list.txt", "r")
         self.tasks_executing_logfile = open("../logfiles/tasks_executing.txt", "r")
-
+    
         # Setup file
         setup = configparser.ConfigParser()
         setup.read('../test_vectors/setup.ini')
-
+    
         # Attributes
         self.global_robot_list = self.global_robot_list_logfile
         self.global_task_list = self.global_task_list_logfile
@@ -49,16 +49,16 @@ class RendererOffLine:
         self.time_axis = []
         self.status_axis = [[] for i in range(self.number_of_agvs)]
         self.battery_axis = [[] for i in range(self.number_of_agvs)]
-
+    
         # Initiate plt
         plt.close("all")
         plt.rcParams['toolbar'] = 'None'
         plt.figure("AGV Simulator", figsize=(11, 6), facecolor='k', edgecolor='k', dpi=100)
         plt.title("AGV Simulator")
-
+    
         # Start offline rendering
         self.render_scene()
-
+    
         # Close files
         self.global_robot_list_logfile.close()
         self.global_task_list_logfile.close()
@@ -66,7 +66,7 @@ class RendererOffLine:
         self.tasks_executing_logfile.close()
 
     def render_scene(self):
-
+    
         for i in range(self.simulation_duration):
             # Read status at time i
             global_robot_list = self.global_robot_list_logfile.readline()
@@ -164,7 +164,7 @@ class RendererOffLine:
                         plt.text(float(robot[1]) - 1, float(robot[2]) + 1.5, str(task[0]))
 
     def plot_AGVs(self):
-
+    
         # Plot AGVs
         global_robot_list = list(self.global_robot_list)
         local_task_list = list(self.local_task_list)
@@ -197,7 +197,7 @@ class RendererOffLine:
                     plt.plot([float(robot[1]), int(task[1])], [float(robot[2]), int(task[2])], color=color, lw=0.5)
 
     def plot_graph(self):
-
+    
         for node in self.graph:
             if node.pos in self.depot_locations:
                 plt.plot(node.pos[0], node.pos[1], 'g^', ms=6)
@@ -210,7 +210,7 @@ class RendererOffLine:
                     plt.plot([node.pos[0], neighbor.pos[0]], [node.pos[1], neighbor.pos[1]], 'b-', lw=0.5)
 
     def make_graph(self):
-
+    
         # Make nodes
         nodes = []
         for j in range(len(self.node_locations)):
@@ -219,14 +219,14 @@ class RendererOffLine:
             node.name = self.node_names[j]
             node.neighbors = self.node_neighbors[j]
             nodes.append(node)
-
+    
         # Replace neighbor names by node objects
         for node in nodes:
             for j in range(len(node.neighbors)):
                 for k in range(len(self.node_names)):
                     if self.node_names[k] == node.neighbors[j]:
                         node.neighbors[j] = nodes[k].copy_node()
-
+    
         return nodes
 
 

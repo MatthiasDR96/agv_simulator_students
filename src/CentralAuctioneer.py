@@ -1,9 +1,12 @@
 import numpy as np
 
-import Comm as comm
+from Comm import Comm
 
 
 class CentralAuctioneer:
+    """
+            A class containing the intelligence of the Central Auctioneer agent
+    """
     
     def __init__(self, env, kb, fm_to_agv_comm, agv_to_fm_comm):
         
@@ -13,6 +16,7 @@ class CentralAuctioneer:
         self.fm_to_agv_comm = fm_to_agv_comm
         self.agv_to_fm_comm = agv_to_fm_comm
         self.fitness_file = open("../logfiles/fitness_values.txt", "w")
+        self.comm = Comm()
         
         # Process
         self.main = self.env.process(self.main())
@@ -34,7 +38,7 @@ class CentralAuctioneer:
             
             # Announce task to robots
             for robot in available_robots:
-                comm.tcp_write(self.fm_to_agv_comm[robot.ID], task)
+                self.comm.tcp_write(self.fm_to_agv_comm[robot.ID], task)
                 # print("Central auctioneer:      Announced task " + task.to_string() + " to robot " + str(robot.ID) +
                 # " at " + str(self.env.now))
             
@@ -55,14 +59,14 @@ class CentralAuctioneer:
             robot = best_bid.robot
             best_bid.task.message = 'assign'
             best_bid.task.robot = robot.ID
-            comm.tcp_write(self.fm_to_agv_comm[robot.ID], best_bid.task)
+            self.comm.tcp_write(self.fm_to_agv_comm[robot.ID], best_bid.task)
             # print("Central auctioneer:      Sent task " + task.to_string() + " to robot " + str(robot.ID) + " at "
             # + str(self.env.now))
     
     def define_current_status(self):
         
         # Copy robot list
-        robots = np.copy(comm.sql_read(self.kb['global_robot_list']))
+        robots = np.copy(self.comm.sql_read(self.kb['global_robot_list']))
         robots = sorted(robots, key=lambda robot_: robot_.ID)
         
         return robots

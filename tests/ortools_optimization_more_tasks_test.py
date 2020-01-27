@@ -46,7 +46,7 @@ def main():
 
         for i in range(num_workers):
             for j in range(num_tasks):
-
+    
                 if solver.Value(x[i][j]) == 1:
                     print('Worker ', i, ' assigned to task ', j, '  Cost = ', cost[i][j])
         print()
