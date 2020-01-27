@@ -18,7 +18,7 @@ class MES:
         self.main = self.env.process(self.main())
 
         # Initialize
-        print("\nMES:              Started")
+        print("\nMES:                     Started")
 
     def main(self):
 
@@ -45,7 +45,7 @@ class MES:
 
             # Put the new task in the global task list
             comm.sql_write(self.kb['global_task_list'], new_task)
-            print('MES:              New task ' + new_task.to_string() + ' arrived at ' + str(self.env.now))
+            print('MES: New task ' + new_task.to_string() + ' arrived at ' + str(self.env.now))
 
             # Read order
             line = file.readline()
@@ -56,6 +56,19 @@ class MES:
 
         # Wait till all tasks are executed
         while True:
+    
+            # Sample time
             yield self.env.timeout(1)
-            if len(self.kb['tasks_executing'].items) == 0 and len(self.kb['global_task_list'].items) == 0:
+    
+            # Check amount of local tasks
+            amount_of_tasks_in_local_task_lists = 0
+            for key in self.kb.keys():
+                if 'local_task_list_R' in key:
+                    amount_of_tasks_in_local_task_lists += len(self.kb[key].items)
+    
+            # Check amount of executing tasks
+            amount_of_executing_tasks = len(self.kb['tasks_executing'].items)
+    
+            # End criterium
+            if amount_of_executing_tasks == 0 and amount_of_tasks_in_local_task_lists == 0:
                 break

@@ -14,6 +14,7 @@ class RendererOnline:
 
         # Attributes
         self.env = env
+        self.kb = kb
         self.locations = kb['graph']
         self.global_robot_list = kb['global_robot_list']
         self.global_task_list = kb['global_task_list']
@@ -79,15 +80,14 @@ class RendererOnline:
                                      [robot.path[i].pos[1], robot.path[i + 1].pos[1]], color=color, lw=1.5)
 
                 # Plot assigned tasks
-                # list = self.local_task_lists[robot.ID - 1]
-                # for item in list.items:
-                # plt.plot([robot.position[0], item.pos_A[0]],
-                # [robot.position[1], item.pos_A[1]], color=color, lw=0.5)
-
-            # Plot tasks not executing
-            for task in self.global_task_list.items:
-                plt.plot(task.pos_A[0], task.pos_A[1], 'gs', ms=7)
-                plt.text(task.pos_A[0] - 1, task.pos_A[1] + 1.5, str(task.order_number))
+                for key in self.kb.keys():
+                    if key == 'local_task_list_R' + str(robot.ID):
+                        list_ = self.kb[key]
+                        for item in list_.items:
+                            plt.plot(item.pos_A[0], item.pos_A[1], 'gs', ms=7)
+                            plt.text(item.pos_A[0] - 1, item.pos_A[1] + 1.5, str(item.order_number))
+                            plt.plot([robot.position[0], item.pos_A[0]],
+                                     [robot.position[1], item.pos_A[1]], color=color, lw=0.5)
 
             # Plot tasks executing
             for task in self.tasks_executing.items:

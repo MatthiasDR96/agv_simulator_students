@@ -24,7 +24,7 @@ class Logger:
     
         # Create logger files
         log_filename_1 = '../logfiles/global_task_list.txt'
-        # log_filename_2 = '../logfiles/local_task_lists.txt'
+        log_filename_2 = '../logfiles/local_task_list.txt'
         log_filename_3 = '../logfiles/tasks_executing.txt'
         log_filename_4 = '../logfiles/global_robot_list.txt'
     
@@ -36,11 +36,11 @@ class Logger:
         log1.addHandler(handler1)
     
         # Create logger 2
-        # log2 = logging.getLogger('MyLogger2')
-        # log2.setLevel(logging.DEBUG)
-        # handler2 = logging.handlers.RotatingFileHandler(
-        # log_filename_2, backupCount=1, mode='w')
-        # log2.addHandler(handler2)
+        log2 = logging.getLogger('MyLogger2')
+        log2.setLevel(logging.DEBUG)
+        handler2 = logging.handlers.RotatingFileHandler(
+            log_filename_2, backupCount=1, mode='w')
+        log2.addHandler(handler2)
     
         # Create logger 3
         log3 = logging.getLogger('MyLogger3')
@@ -68,10 +68,13 @@ class Logger:
                 global_task_list_string += task.to_log() + ":"
 
             # Local task lists
-            # local_task_lists_string = ""
-            # for i in range(len(self.local_task_lists)):
-            # list = str(i + 1) + ',' + str([task.to_log() for task in self.local_task_lists[i].items])
-            # local_task_lists_string += list + ":"
+            local_task_list_string = ""
+            for key in self.kb.keys():
+                if "local_task_list_R" in key:
+                    local_task_list_string += str(key[-1]) + ";"
+                    local_task_list = comm.sql_read(self.kb[key])
+                    for task in local_task_list:
+                        local_task_list_string += str(task.to_log()) + ":"
 
             # Task executing
             tasks_executing_string = ""
@@ -89,6 +92,6 @@ class Logger:
     
             # Logging to logging files
             log1.debug(str(self.env.now) + "/" + str(global_task_list_string))
-            # log2.debug(str(self.env.now) + "/" + str(local_task_lists_string))
+            log2.debug(str(self.env.now) + "/" + str(local_task_list_string))
             log3.debug(str(self.env.now) + "/" + str(tasks_executing_string))
             log4.debug(str(self.env.now) + "/" + str(global_robot_list_string))

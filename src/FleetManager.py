@@ -11,13 +11,18 @@ class FleetManager:
     """
             A class containing the intelligence of the Fleetmanager agent
     """
-    
-    def __init__(self, env, kb, agv_fm_comm):
 
-        # Attributes
+    def __init__(self, env, kb, agv_fm_comm, agv_to_fm_comm):
+    
+        # Simulation environment
         self.env = env
+    
+        # Communication attributes
         self.kb = kb
         self.agv_fm_comm = agv_fm_comm
+        self.agv_to_fm_comm = agv_to_fm_comm
+    
+        # Other attributes
         self.astar = Astar(self.kb['graph'])  # Astar shortest path finder
         self.fitness_file = open("../logfiles/fitness_values.txt", "w")
 
@@ -25,7 +30,7 @@ class FleetManager:
         self.main = self.env.process(self.main())
 
         # Initialize
-        print("Fleet manager:    Started")
+        print("Fleet manager:           Started")
 
     def main(self):
 
@@ -44,7 +49,7 @@ class FleetManager:
             # print('FleetManager:     Robot list at ' + str(self.env.now) + ': ' + str(
             # [robot.to_string() for robot in available_robots]))
 
-            # If there are robots available and tasks to execute
+            # If there are robots available and tasks to execute, optimize and assign
             if not len(tasks_to_execute) == 0 and not len(available_robots) == 0:
 
                 # Optimization
@@ -62,14 +67,15 @@ class FleetManager:
                     for j in range(len(tasks_to_execute)):
                         if solution[i][j] == 1:
                             assigned_tasks.append(tasks_to_execute[j])
-                            # print("FleetManager:     Assigned task " + str(tasks[j].order_number) +" to AGV " +
-                            # str(robots[i].ID) + " at " + str(self.env.now))
+                            # print("FleetManager:     Assigned task " + str(assigned_tasks[j].order_number)
+                            # + " to AGV " + str(available_robots[i].ID) + " at " + str(self.env.now))
     
                     # Pick the task closest to the robot
                     robot_pos = available_robots[i].position
-                    chosen_task = sorted(assigned_tasks, key=lambda task: self.get_first_task(task, robot_pos))
-                    if chosen_task:
-                        execution_list[available_robots[i].ID] = chosen_task[0]  # Pick first task (closest)
+                    ordered_tasks = sorted(assigned_tasks, key=lambda task: self.get_first_task(task, robot_pos))
+                    if ordered_tasks:
+                        chosen_task = ordered_tasks[0]
+                        execution_list[available_robots[i].ID] = chosen_task  # Pick first task (closest)
 
                 # Send tasks to AGVs
                 for k, v in execution_list.items():
@@ -108,7 +114,7 @@ class FleetManager:
     def get_first_task(self, task, robot_pos):
         distance, _ = self.astar.find_shortest_path(task.pos_A, robot_pos)
         priority = task.priority
-        result = distance * priority
+        result = distance  # * priority
         return result
     
 

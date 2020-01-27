@@ -1,23 +1,29 @@
+from __future__ import print_function
+
 import math
+
+import simpy
 
 import Comm as comm
 from Astar import Astar
 from Robot import Robot
+from TravelingSalesman import TravelingSalesman
 
 
 class AGV:
     """
         A class containing the intelligence of the AGV agent
     """
-    
-    def __init__(self, env, agv_params, kb, agv_fm_comm):
 
-        # Attributes
+    def __init__(self, env, agv_params, kb, fm_to_agv_comm, agv_to_fm_comm):
+    
+        # Simulation environment
         self.env = env
 
         # Communication attributes
         self.kb = kb
-        self.agv_fm_comm = agv_fm_comm
+        self.fm_to_agv_comm = fm_to_agv_comm
+        self.agv_to_fm_comm = agv_to_fm_comm
 
         # AGV attributes
         self.ID = agv_params['ID']  # Each AGV has an unique ID number
@@ -26,14 +32,20 @@ class AGV:
         self.robot_location = agv_params['start_location']  # Current AGV location
         self.battery_threshold = agv_params['battery_threshold']  # Battery threshold when the AGV needs to charge
         self.max_charging_time = agv_params['max_charging_time']  # One hour to charge fully
-
+    
+        # Local task list
+        self.local_task_list = simpy.FilterStore(self.env)
+        self.kb['local_task_list_R' + str(self.ID)] = simpy.FilterStore(self.env)
+        
         # Layout attributes
         self.charging_stations = kb['charge_locations']
         self.astar = Astar(self.kb['graph'])  # Astar shortest path planner
+        self.tsp = TravelingSalesman(self.astar)
 
         # Updated attributes
         self.heading_direction = 0  # Direction towards which the AGV is driving
         self.path = []  # Current path to execute
+        self.cost_of_current_tour = 0
 
         # Monitoring attributes
         self.status = 'IDLE'  # Current AGV status
@@ -41,51 +53,53 @@ class AGV:
 
         # Processes
         self.main = self.env.process(self.main())
+        self.status_updater = self.env.process(self.status_updater())
         self.status_manager = self.env.process(self.status_manager())
+        self.task_collector = self.env.process(self.task_collector())
 
         # Initialize
-        print("AGV " + str(self.ID) + ":            Started")
-        robot = Robot(self.ID, self.robot_location)
-        comm.sql_write(self.kb['global_robot_list'], robot)
+        print("AGV " + str(self.ID) + ":                   Started")
+        self.robot = Robot(self.ID, self.robot_location)
+        comm.sql_write(self.kb['global_robot_list'], self.robot)
 
     def main(self):
 
         while True:
     
             # Wait for an assigned task
-            print("AGV " + str(self.ID) + ":            Waiting for tasks...")
-            task = yield self.agv_fm_comm.get()
+            print("AGV " + str(self.ID) + ":      Waiting for tasks..." + " at " + str(self.env.now))
+            task = yield self.local_task_list.get()
     
-            # Execute task
-            print("AGV " + str(self.ID) + ":            Start executing task " + str(task.to_string()) + " at " +
-                  str(self.env.now))
-            self.status = 'BUSY'
-            self.update_robot_status()
-    
-            # Remove task from global task list and add to executing list
-            comm.sql_remove(self.kb['global_task_list'], task.order_number)
-            task.robot = self.ID
-            comm.sql_write(self.kb['tasks_executing'], task)
-    
-            # Go to task A
-            yield self.env.process(self.execute_path(task.pos_A))
-    
-            # Perform task A
-            yield self.env.timeout(self.task_execution_time)
-            task.picked = True
-            print("AGV " + str(self.ID) + ":            Picked item of task " + str(task.order_number) + " at " +
-                  str(self.env.now))
-    
-            # Go to task B
-            yield self.env.process(self.execute_path(task.pos_B))
-    
-            # Perform task B
-            yield self.env.timeout(self.task_execution_time)
-            print("AGV " + str(self.ID) + ":            Dropped item of task " + str(task.order_number) + " at " +
-                  str(self.env.now))
-    
-            # Task executed
-            comm.sql_remove(self.kb['tasks_executing'], task.order_number)
+            if task:
+                # Start task
+                print("AGV " + str(self.ID) + ":      Start executing task " + str(task.to_string()) +
+                      " at " + str(self.env.now))
+                self.status = 'BUSY'
+        
+                # Remove task from global task list and add to executing list
+                comm.sql_remove(self.kb['global_task_list'], task.order_number)
+                task.robot = self.ID
+                comm.sql_write(self.kb['tasks_executing'], task)
+        
+                # Go to task A
+                yield self.env.process(self.execute_path(task.pos_A))
+        
+                # Perform task A
+                yield self.env.timeout(self.task_execution_time)
+                task.picked = True
+                print("AGV " + str(self.ID) + ":      Picked item of task " + str(task.order_number) + " at "
+                      + str(self.env.now))
+        
+                # Go to task B
+                yield self.env.process(self.execute_path(task.pos_B))
+        
+                # Perform task B
+                yield self.env.timeout(self.task_execution_time)
+                print("AGV " + str(self.ID) + ":      Dropped item of task " + str(task.order_number) + " at " +
+                      str(self.env.now))
+        
+                # Task executed
+                comm.sql_remove(self.kb['tasks_executing'], task.order_number)
     
             # If battery threshold exceeded, go to closest charging station and charge fully
             if self.status == 'EMPTY':
@@ -93,31 +107,6 @@ class AGV:
 
             # Set status to IDLE when task is done or when done charging
             self.status = 'IDLE'
-            self.update_robot_status()
-
-    def charge(self):
-    
-        # Search for closest charging station
-        self.status = 'CHARGING'
-        self.update_robot_status()
-        print("AGV " + str(self.ID) + ":            Goes to closest charging station at " + str(self.env.now))
-        closest_charging_station = self.search_closest_charging_station()
-    
-        # Go to the charging station
-        yield self.env.process(self.execute_path(closest_charging_station))
-    
-        # Compute amount to charge
-        tmp_scale = 0.01
-        amount_to_charge = 100 - self.battery_status
-        charge_time = ((self.max_charging_time * amount_to_charge) / 100) * tmp_scale
-        print("AGV " + str(self.ID) + ":            Is charging for " + str(charge_time) + " seconds at " + str(
-            self.env.now))
-    
-        # Charge
-        yield self.env.timeout(charge_time)
-        self.battery_status = 100
-        self.status = 'IDLE'
-        self.update_robot_status()
 
     def execute_path(self, goal_position):
     
@@ -125,7 +114,6 @@ class AGV:
         start_position = (int(self.robot_location[0]), int(self.robot_location[1]))
         distance, path = self.astar.find_shortest_path(start_position, goal_position)
         self.path = path[1:]
-        self.update_robot_status()
         # print("Path to follow: " + str([node.pos for node in self.path]))
 
         # Move from node to node
@@ -153,33 +141,40 @@ class AGV:
         # To be sure the AGV is exact on the node
         self.robot_location = (node.pos[0], node.pos[1])
         self.path = self.path[1:]
-        self.update_robot_status()
 
     def move(self, x, y, travel_time):
     
         # Compute heading direction
         self.heading_direction = math.atan2((y - self.robot_location[1]), (x - self.robot_location[0]))
-        self.update_robot_status()
     
         # Move
         yield self.env.timeout(travel_time)
         self.battery_status = round((self.battery_status - compute_charge_loss(travel_time)), 2)
         self.robot_location = (x, y)
-        self.update_robot_status()
-
-    def update_robot_status(self):
-        self.kb['global_robot_list'].get(lambda robot_: robot_.ID == self.ID)  # Should be with comm.sql_remove
-        robot = Robot(self.ID, self.robot_location, self.heading_direction, self.path, self.status, self.battery_status)
-        comm.sql_write(self.kb['global_robot_list'], robot)
 
     def status_manager(self):
         while True:
-            yield self.env.timeout(0.01)  # Sample time
+            yield self.env.timeout(1)  # Sample time
             if not self.status == 'CHARGING':
                 if self.battery_status < self.battery_threshold:
                     self.status = 'EMPTY'
-                    self.update_robot_status()
 
+    def status_updater(self):
+        while True:
+            yield self.env.timeout(1)  # Sample time
+        
+            # Update global robot list
+            self.kb['global_robot_list'].get(lambda robot_: robot_.ID == self.ID)  # Should be with comm.sql_remove
+            self.robot = Robot(self.ID, self.robot_location, self.heading_direction, self.path, self.status,
+                               self.battery_status)
+            comm.sql_write(self.kb['global_robot_list'], self.robot)
+        
+            # Update local task lists
+            for task in self.kb['local_task_list_R' + str(self.ID)].items:
+                self.kb['local_task_list_R' + str(self.ID)].get()
+            self.kb['local_task_list_R' + str(self.ID)].get()
+            [comm.sql_write(self.kb['local_task_list_R' + str(self.ID)], task) for task in self.local_task_list.items]
+        
     def search_closest_charging_station(self):
         closest_point = None
         min_distance = 1000

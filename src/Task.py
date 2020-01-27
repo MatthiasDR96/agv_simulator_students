@@ -11,6 +11,7 @@ class Task:
         self.priority = priority
         self.robot = None
         self.picked = False
+        self.message = None
 
     def to_log(self):
 
@@ -24,5 +25,6 @@ class Task:
                    + str(self.priority) + ';' + str(int(self.picked))
 
     def to_string(self):
-
-        return '[' + str(self.order_number) + ", " + str(self.pos_A) + ", " + str(self.pos_B) + ']'
+    
+        return '[' + str(self.order_number) + ", " + str(self.pos_A) + ", " \
+               + str(self.pos_B) + ", " + str(self.priority) + ']'

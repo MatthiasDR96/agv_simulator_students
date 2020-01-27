@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 import simpy
 
 from AGV import AGV
-from FleetManager import FleetManager
+from CentralAuctioneer import CentralAuctioneer
+from Logger import Logger
 from MES import MES
 from Node import Node
 
@@ -60,14 +61,17 @@ class Simulation:
         kb = self.define_knowledge_base(env)
         
         # Define communication channel between FleetManager and AGVs
-        agv_fm_comm = dict()
-        [agv_fm_comm.update({i + 1: simpy.FilterStore(env)}) for i in range(self.number_of_agvs)]
+        fm_to_agv_comm = dict()
+        [fm_to_agv_comm.update({i + 1: simpy.FilterStore(env)}) for i in range(self.number_of_agvs)]
+
+        # Define communication channel between AGVs and fleet manager
+        agv_to_fm_comm = simpy.FilterStore(env)
         
         # Define MES
         mes = MES(env, kb, self.order_list)
-        
-        # Define Fleet Manger
-        FleetManager(env, kb, agv_fm_comm)
+
+        # Define Fleet Manger / Central Auctioneer
+        CentralAuctioneer(env, kb, fm_to_agv_comm, agv_to_fm_comm)
         
         # Define AGVs
         for ID in range(self.number_of_agvs):
@@ -77,10 +81,10 @@ class Simulation:
                           'start_location': self.start_locations[ID],
                           'battery_threshold': self.battery_threshold,
                           'max_charging_time': self.max_charging_time}
-            AGV(env, agv_params, kb, agv_fm_comm[ID + 1])
+            AGV(env, agv_params, kb, fm_to_agv_comm[ID + 1], agv_to_fm_comm)
         
         # Define logger
-        # Logger(env, kb)
+        Logger(env, kb)
         
         # Define online renderer
         # RendererOnline(env, kb, self.depot_locations, self.charge_locations)
