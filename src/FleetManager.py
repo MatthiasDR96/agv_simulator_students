@@ -3,8 +3,8 @@ import math
 import numpy as np
 from ortools.sat.python import cp_model
 
-from Astar import Astar
-from Comm import Comm
+from .Astar import Astar
+from .Comm import Comm
 
 
 class FleetManager:
@@ -18,10 +18,11 @@ class FleetManager:
         self.env = env
     
         # Communication attributes
+        self.ip = '172.21.0.0'
         self.kb = kb
         self.agv_fm_comm = agv_fm_comm
         self.agv_to_fm_comm = agv_to_fm_comm
-        self.comm = Comm()
+        self.comm = Comm(self.ip)
         
         # Other attributes
         self.astar = Astar(self.kb['graph'])  # Astar shortest path finder

@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import numpy as np
+import math
 from ortools.constraint_solver import pywrapcp
 from ortools.constraint_solver import routing_enums_pb2
 
@@ -41,20 +42,18 @@ class TravelingSalesman:
         assignment = routing.SolveWithParameters(search_parameters)
         
         # Print solution on console.
-        distance, plan = get_plan(self.manager, routing, assignment)
+        _, plan = get_plan(self.manager, routing, assignment)
         
+        # Construct optimized tour
         optimized_tour = []
         for i in plan:
             optimized_tour.append(tasks[i])
+            
+        # Compute total travel time
+        total_travel_time = compute_total_travel_time(optimized_tour, robot_location)
         
-        distance, _ = self.astar.find_shortest_path(robot_location, optimized_tour[0].pos_A)
-        for i in range(len(optimized_tour) - 1):
-            distance_1, _ = self.astar.find_shortest_path(optimized_tour[i].pos_A, optimized_tour[i].pos_B)
-            distance_2, _ = self.astar.find_shortest_path(optimized_tour[i].pos_B, optimized_tour[i + 1].pos_A)
-            distance += distance_1 + distance_2
+        return optimized_tour, total_travel_time
         
-        return distance, optimized_tour
-    
     def distance_callback(self, from_index, to_index):
         """Returns the distance between the two nodes."""
         # Convert from routing variable Index to distance matrix NodeIndex.
@@ -70,9 +69,12 @@ class TravelingSalesman:
                 if i == j:
                     data['distance_matrix'][i, j] = 0
                 else:
-                    distance_r1, _ = self.astar.find_shortest_path(robot_location, tasks[i].pos_A)
-                    distance_12, _ = self.astar.find_shortest_path(tasks[i].pos_B, tasks[j].pos_A)
-                    data['distance_matrix'][i, j] = distance_r1 + distance_12
+                    # distance_r1, _ = self.astar.find_shortest_path(robot_location, tasks[i].pos_A)
+                    # distance_12, _ = self.astar.find_shortest_path(tasks[i].pos_B, tasks[j].pos_A)
+                    #distance_r1 = calculate_euclidean_distance(robot_location, tasks[i].pos_A)
+                    #distance_12 = calculate_euclidean_distance(tasks[i].pos_B, tasks[j].pos_A)
+                    distance_r1 = calculate_euclidean_distance(tasks[i], tasks[j])
+                    data['distance_matrix'][i, j] = distance_r1 #+ distance_12
         data['num_vehicles'] = 1
         data['depot'] = 0
         return data
@@ -97,3 +99,24 @@ def get_locations(tasks, robot_location):
         locations.append(task.pos_A)
         locations.append(task.pos_B)
     return locations
+
+
+def calculate_euclidean_distance(a, b):
+    return math.sqrt(math.pow(b[0] - a[0], 2) + math.pow(b[1] - a[1], 2))
+
+
+def compute_total_travel_time(optimized_tour, robot_location):
+    distance = calculate_euclidean_distance(robot_location, optimized_tour[0].pos_A)
+    for i in range(len(optimized_tour)-1):
+        distance += calculate_euclidean_distance(optimized_tour[i].pos_A, optimized_tour[i].pos_B)
+        distance += calculate_euclidean_distance(optimized_tour[i].pos_B, optimized_tour[i+1].pos_A)
+    distance += calculate_euclidean_distance(optimized_tour[-1].pos_A, optimized_tour[-1].pos_B)
+    return distance
+
+
+def compute_total_travel_time_simple(optimized_tour, robot_location):
+    distance = 0
+    for i in range(len(optimized_tour)-1):
+        distance += calculate_euclidean_distance(optimized_tour[i], optimized_tour[i+1])
+    distance += calculate_euclidean_distance(optimized_tour[-1], optimized_tour[0])
+    return distance

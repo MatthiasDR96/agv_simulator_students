@@ -5,7 +5,7 @@ class Action:
     
     def __init__(self, agv):
         self.agv = agv
-    
+
     def move_to_node(self, node):
         # Interpolate path
         iterations = 5
@@ -25,7 +25,7 @@ class Action:
         # To be sure the AGV is exact on the node
         self.agv.robot_location = (node.pos[0], node.pos[1])
         self.agv.path = self.agv.path[1:]
-    
+
     def move(self, x, y, travel_time):
         # Compute heading direction
         self.agv.heading_direction = math.atan2((y - self.agv.robot_location[1]), (x - self.agv.robot_location[0]))
@@ -46,7 +46,7 @@ class Action:
     def place(self):
         yield self.agv.env.timeout(self.agv.task_execution_time)
 
-
+   
 def calculate_euclidean_distance(a, b):
     return math.sqrt(math.pow(b[0] - a[0], 2) + math.pow(b[1] - a[1], 2))
 

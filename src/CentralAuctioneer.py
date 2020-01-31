@@ -10,13 +10,15 @@ class CentralAuctioneer:
     
     def __init__(self, env, kb, fm_to_agv_comm, agv_to_fm_comm):
         
-        # Attributes
+        # Simulation environment
         self.env = env
+        
+        # Communication attributes
+        self.ip = '172.21.0.0'
         self.kb = kb
         self.fm_to_agv_comm = fm_to_agv_comm
         self.agv_to_fm_comm = agv_to_fm_comm
-        self.fitness_file = open("../logfiles/fitness_values.txt", "w")
-        self.comm = Comm()
+        self.comm = Comm(self.ip)
         
         # Process
         self.main = self.env.process(self.main())

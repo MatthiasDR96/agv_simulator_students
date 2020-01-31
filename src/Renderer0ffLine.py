@@ -6,7 +6,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-from Node import Node
+from .Node import Node
 
 plt.ion()
 

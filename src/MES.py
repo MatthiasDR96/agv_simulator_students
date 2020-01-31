@@ -9,13 +9,18 @@ class MES:
     
     def __init__(self, env, kb, order_list):
     
-        # Attributes
-        self.env = env  # Environment
-        self.kb = kb  # Knowledge base
-        self.order_list = order_list  # List of orders to spawn
-        self.comm = Comm()
+        # Simulation environment
+        self.env = env
         
-        # Processes
+        # Communication attributes
+        self.ip = '172.21.0.0'
+        self.kb = kb  # Knowledge base
+        self.comm = Comm(self.ip)
+
+        # List of orders to spawn
+        self.order_list = order_list
+        
+        # Process
         self.main = self.env.process(self.main())
     
         # Initialize

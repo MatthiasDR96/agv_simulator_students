@@ -13,13 +13,19 @@ class Logger:
     
     def __init__(self, env, kb):
     
-        # Attributes
+        # Simulation environment
         self.env = env
+        
+        # Communication attributes
+        self.ip = '172.21.0.0'
         self.kb = kb
-        self.comm = Comm()
+        self.comm = Comm(self.ip)
         
         # Process
         self.logging = self.env.process(self.logging())
+
+        # Initialize
+        print("Logger:                 Started")
 
     def logging(self):
     

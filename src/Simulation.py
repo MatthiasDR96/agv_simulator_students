@@ -88,7 +88,7 @@ class Simulation:
         Logger(env, kb)
         
         # Define online renderer
-        RendererOnline(env, kb, self.depot_locations, self.charge_locations)
+        # RendererOnline(env, kb, self.depot_locations, self.charge_locations)
         
         # Run environment
         env.run(until=mes.main)

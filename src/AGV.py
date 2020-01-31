@@ -20,9 +20,11 @@ class AGV:
         self.env = env
     
         # Communication attributes
+        self.ip = '172.21.0.0'
         self.kb = kb
         self.fm_to_agv_comm = fm_to_agv_comm
         self.agv_to_fm_comm = agv_to_fm_comm
+        self.comm = Comm(self.ip)
     
         # AGV attributes
         self.ID = agv_params['ID']  # Each AGV has an unique ID number
@@ -31,6 +33,11 @@ class AGV:
         self.robot_location = agv_params['start_location']  # Current AGV location
         self.battery_threshold = agv_params['battery_threshold']  # Battery threshold when the AGV needs to charge
         self.max_charging_time = agv_params['max_charging_time']  # One hour to charge fully
+        self.maximum_resource_time = 100
+        self.maximum_resources = 100
+        self.minimum_resources = 20
+        self.initial_resources = 100
+        self.resource_scale_factor = 0.1
     
         # Local task list
         self.local_task_list = simpy.FilterStore(self.env)
@@ -43,7 +50,7 @@ class AGV:
         # Updated attributes
         self.heading_direction = 0  # Direction towards which the AGV is driving
         self.path = []  # Current path to execute
-        self.cost_of_current_tour = 0
+        self.task_executing = None
     
         # Monitoring attributes
         self.status = 'IDLE'  # Current AGV status
@@ -54,7 +61,6 @@ class AGV:
         self.motion_planning = MotionPlanning(self)
         self.resource_management = ResourceManagement(self)
         self.action = Action(self)
-        self.comm = Comm()
         
         # Processes
         self.main = self.env.process(self.main())
@@ -72,38 +78,38 @@ class AGV:
         
             # Wait for an assigned task
             print("AGV " + str(self.ID) + ":      Waiting for tasks..." + " at " + str(self.env.now))
-            task = yield self.local_task_list.get()
+            self.task_executing = yield self.local_task_list.get()
         
-            if task:
-                # Start task
-                print("AGV " + str(self.ID) + ":      Start executing task " + str(task.to_string()) +
-                      " at " + str(self.env.now))
-                self.status = 'BUSY'
+            # Start task
+            print("AGV " + str(self.ID) + ":      Start executing task " + str(self.task_executing.to_string()) +
+                  " at " + str(self.env.now))
+            self.status = 'BUSY'
 
-                # Remove task from global task list and add to executing list
-                self.comm.sql_remove(self.kb['global_task_list'], task.order_number)
-                task.robot = self.ID
-                self.comm.sql_write(self.kb['tasks_executing'], task)
+            # Remove task from global task list and add to executing list
+            self.comm.sql_remove(self.kb['global_task_list'], self.task_executing.order_number)
+            self.task_executing.robot = self.ID
+            self.comm.sql_write(self.kb['tasks_executing'], self.task_executing)
                 
-                # Go to task A
-                yield self.env.process(self.execute_path(task.pos_A))
+            # Go to task A
+            yield self.env.process(self.execute_path(self.task_executing.pos_A))
 
-                # Perform task A
-                yield self.env.process(self.action.pick())
-                task.picked = True
-                print("AGV " + str(self.ID) + ":      Picked item of task " + str(task.order_number) + " at "
-                      + str(self.env.now))
+            # Perform task A
+            yield self.env.process(self.action.pick())
+            self.task_executing.picked = True
+            print("AGV " + str(self.ID) + ":      Picked item of task " + str(self.task_executing.order_number) + " at "
+                  + str(self.env.now))
 
-                # Go to task B
-                yield self.env.process(self.execute_path(task.pos_B))
+            # Go to task B
+            yield self.env.process(self.execute_path(self.task_executing.pos_B))
 
-                # Perform task B
-                yield self.env.process(self.action.place())
-                print("AGV " + str(self.ID) + ":      Dropped item of task " + str(task.order_number) + " at " +
-                      str(self.env.now))
+            # Perform task B
+            yield self.env.process(self.action.place())
+            print("AGV " + str(self.ID) + ":      Dropped item of task " + str(self.task_executing.order_number)
+                  + " at " + str(self.env.now))
 
-                # Task executed
-                self.comm.sql_remove(self.kb['tasks_executing'], task.order_number)
+            # Task executed
+            self.comm.sql_remove(self.kb['tasks_executing'], self.task_executing.order_number)
+            self.task_executing = None
             
             # If battery threshold exceeded, go to closest charging station and charge fully
             if self.status == 'EMPTY':
