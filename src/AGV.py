@@ -3,7 +3,6 @@ import simpy
 from Action import Action
 from Astar import Astar
 from Comm import Comm
-from MotionPlanning import MotionPlanning
 from ResourceManagement import ResourceManagement
 from Robot import Robot
 from TaskAllocation import TaskAllocation
@@ -21,7 +20,7 @@ class AGV:
     
         # Communication attributes
         self.ip = '172.21.0.0'
-        self.kb = kb
+        self.kb = kb  # Knwoledge base (SQL database)
         self.fm_to_agv_comm = fm_to_agv_comm
         self.agv_to_fm_comm = agv_to_fm_comm
         self.comm = Comm(self.ip)
@@ -58,7 +57,6 @@ class AGV:
     
         # AGV tasks
         self.task_allocation = TaskAllocation(self)
-        self.motion_planning = MotionPlanning(self)
         self.resource_management = ResourceManagement(self)
         self.action = Action(self)
         
@@ -118,6 +116,7 @@ class AGV:
             # Set status to IDLE when task is done or when done charging
             self.status = 'IDLE'
 
+    # Calculates shortest path with Astar and executes
     def execute_path(self, goal_position):
     
         # Compute astar path
@@ -131,6 +130,7 @@ class AGV:
             node = self.path[0]
             yield self.env.process(self.action.move_to_node(node))
     
+    # Monitors charging status
     def status_manager(self):
         while True:
             yield self.env.timeout(1)  # Sample time
@@ -138,19 +138,20 @@ class AGV:
                 if self.battery_status < self.battery_threshold:
                     self.status = 'EMPTY'
 
+    # Udpates the knowledge base
     def status_updater(self):
         while True:
     
-            # Update global robot list
+            # Update global robot list (Remove old database entry and add new one)
             self.kb['global_robot_list'].get(lambda robot_: robot_.ID == self.ID)  # Should be with comm.sql_remove
             self.robot = Robot(self.ID, self.robot_location, self.heading_direction, self.path, self.status,
                                self.battery_status)
             self.comm.sql_write(self.kb['global_robot_list'], self.robot)
             
-            # Update local task lists
+            # Update local task lists (Remove old database entry and add new one)
             for i in self.kb['local_task_list_R' + str(self.ID)].items:
-                self.kb['local_task_list_R' + str(self.ID)].get()
-            self.kb['local_task_list_R' + str(self.ID)].get()
+                self.kb['local_task_list_R' + str(self.ID)].get()  # Removes the item from the stack
+            self.kb['local_task_list_R' + str(self.ID)].get()  # Removes the item from the stack
             [self.comm.sql_write(self.kb['local_task_list_R' + str(self.ID)], task)
              for task in self.local_task_list.items]
     

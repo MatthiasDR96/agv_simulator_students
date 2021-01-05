@@ -2,10 +2,15 @@ import math
 
 
 class Action:
+    """
+            A library containing the interfaces to the motors of the AGV. When the simulation software would to be used
+            in an experimental setup, it is sufficient to change the methods in this library.
+    """
     
     def __init__(self, agv):
         self.agv = agv
 
+    # Moves the AGV to a node with a certain location (Should be changed to ROS Navigation Stack)
     def move_to_node(self, node):
         # Interpolate path
         iterations = 5
@@ -26,6 +31,7 @@ class Action:
         self.agv.robot_location = (node.pos[0], node.pos[1])
         self.agv.path = self.agv.path[1:]
 
+    # Physically moves the agv to the node
     def move(self, x, y, travel_time):
         # Compute heading direction
         self.agv.heading_direction = math.atan2((y - self.agv.robot_location[1]), (x - self.agv.robot_location[0]))
@@ -40,9 +46,11 @@ class Action:
         total_travel_time = distance / self.agv.robot_speed
         return total_travel_time
     
+    # Here the software to communicate with the Fanuc Robot can be used
     def pick(self):
         yield self.agv.env.timeout(self.agv.task_execution_time)
-    
+
+    # Here the software to communicate with the Fanuc Robot can be used
     def place(self):
         yield self.agv.env.timeout(self.agv.task_execution_time)
 

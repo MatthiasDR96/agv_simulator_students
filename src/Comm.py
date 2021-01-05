@@ -1,7 +1,7 @@
 class Comm:
     """
         A library containing the interfaces to communicate with an SQL knowledge base or with other devices via TCP/IP
-        When the simulation software want to be used in an experimental setup, it is sufficient to change the methods
+        When the simulation software would to be used in an experimental setup, it is sufficient to change the methods
         in this library.
     """
     

@@ -5,14 +5,15 @@ import matplotlib.pyplot as plt
 import simpy
 
 from AGV import AGV
-from CentralAuctioneer import CentralAuctioneer
 from Logger import Logger
 from MES import MES
 from Node import Node
 from RendererOnline import RendererOnline
+from FleetManager import FleetManager
 
 
 class Simulation:
+
     """
             This is the baseclass for the simulation, the whole simulation is set up and started from here.
     """
@@ -58,21 +59,21 @@ class Simulation:
         # Define simulation environment
         env = simpy.Environment()
         
-        # Define knowledge base
+        # Define knowledge base (SQL database)
         kb = self.define_knowledge_base(env)
         
-        # Define communication channel between FleetManager and AGVs
+        # Define communication channel between FleetManager and AGVs (These are just the virtual IP adresses)
         fm_to_agv_comm = dict()
         [fm_to_agv_comm.update({i + 1: simpy.FilterStore(env)}) for i in range(self.number_of_agvs)]
 
-        # Define communication channel between AGVs and fleet manager
+        # Define communication channel between AGVs and fleet manager (These are just the virtual IP adresses)
         agv_to_fm_comm = simpy.FilterStore(env)
         
         # Define MES
         mes = MES(env, kb, self.order_list)
 
         # Define Fleet Manger / Central Auctioneer
-        CentralAuctioneer(env, kb, fm_to_agv_comm, agv_to_fm_comm)
+        FleetManager(env, kb, fm_to_agv_comm, agv_to_fm_comm)
         
         # Define AGVs
         for ID in range(self.number_of_agvs):
@@ -87,10 +88,10 @@ class Simulation:
         # Define logger
         Logger(env, kb)
         
-        # Define online renderer
-        # RendererOnline(env, kb, self.depot_locations, self.charge_locations)
+        # Define online renderer (Remove this line when using OfflineRenderer)
+        RendererOnline(env, kb, self.depot_locations, self.charge_locations)
         
-        # Run environment
+        # Run environment untill all tasks are executed
         env.run(until=mes.main)
         
         # Return duration of simulation
@@ -104,6 +105,7 @@ class Simulation:
         print("AGVs start locations are fixed.")
         print("Fleet manager uses a linear programming optimizer.")
     
+    # Constructs the layout
     def make_graph(self):
     
         # Make nodes
@@ -124,11 +126,12 @@ class Simulation:
     
         return nodes
     
+    # Creates the central knowledge base
     def define_knowledge_base(self, env):
-        global_task_list = simpy.FilterStore(env)
-        global_robot_list = simpy.FilterStore(env)
-        tasks_executing = simpy.FilterStore(env)
-        graph = self.make_graph()
+        global_task_list = simpy.FilterStore(env)  # This needs to be a table in SQL database
+        global_robot_list = simpy.FilterStore(env)  # This needs to be a table in SQL database
+        tasks_executing = simpy.FilterStore(env)  # This needs to be a table in SQL database
+        graph = self.make_graph()  # This needs to be a table in SQL database
         kb = dict()
         kb['global_task_list'] = global_task_list
         kb['global_robot_list'] = global_robot_list
@@ -157,5 +160,6 @@ def plot_layout(locations):
 
 
 if __name__ == '__main__':
+
     # Run simulation
     sim = Simulation()

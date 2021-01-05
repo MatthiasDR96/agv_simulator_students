@@ -78,7 +78,7 @@ class MES:
             # Check amount af tasks in global task list
             amount_of_global_tasks = len(self.kb['global_task_list'].items)
             
-            # End criterium
+            # End criterium to end simulation when all tasks are done
             if amount_of_executing_tasks == 0 and amount_of_tasks_in_local_task_lists == 0 \
                     and amount_of_global_tasks == 0:
                 break

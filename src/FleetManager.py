@@ -3,8 +3,8 @@ import math
 import numpy as np
 from ortools.sat.python import cp_model
 
-from .Astar import Astar
-from .Comm import Comm
+from Astar import Astar
+from Comm import Comm
 
 
 class FleetManager:
@@ -87,6 +87,7 @@ class FleetManager:
                 # Log fitness values for no assignment (0.0)
                 self.fitness_file.write(str(self.env.now) + "," + str(0.0) + ",\n")
 
+    # Looks how many tasks need to be assigned and how many robots are available
     def define_current_status(self):
     
         # Copy robot list
@@ -113,6 +114,7 @@ class FleetManager:
                 cost_matrix[i, j] = (distance_ra + distance_ab)
         return robots_, tasks, cost_matrix
     
+    # Selects task from assigned task lists to execute first
     def get_first_task(self, task, robot_pos):
         distance, _ = self.astar.find_shortest_path(task.pos_A, robot_pos)
         priority = task.priority
@@ -124,6 +126,7 @@ def calculate_euclidean_distance(a, b):
     return math.sqrt(math.pow((b[0] - a[0]), 2) + math.pow((b[1] - a[1]), 2))
 
 
+# Task Allocation Optimization
 def optimization(number_robots, number_tasks, distance_matrix):
     # Cost matrix
     cost = distance_matrix.astype(int)
