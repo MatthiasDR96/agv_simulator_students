@@ -46,16 +46,27 @@ class Comm:
     
         # Execute SQL command
         return request.items
-    
-    def sql_remove(self, request, order_number):
-        
+
+    def sql_remove_task(self, request, order_number):
         # Get destination ip and port
         src_ip = self.ip
         dest_ip = None
         dest_port = None
-    
+
         # Construct SQL command
         message = None
-    
+
         # Execute SQL command
         request.get(lambda task: task.order_number == order_number)
+
+    def sql_remove_robot(self, request, id):
+        # Get destination ip and port
+        src_ip = self.ip
+        dest_ip = None
+        dest_port = None
+
+        # Construct SQL command
+        message = None
+
+        # Execute SQL command
+        request.get(lambda robot: robot.ID == id)

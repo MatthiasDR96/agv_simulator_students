@@ -1,8 +1,6 @@
-math
 numpy
 matplotlib
 configparser
-random
 mysql
 pyswarm
 ortools >= 7.4.7247

@@ -20,12 +20,6 @@ class TaskAllocation:
             task = yield self.agv.fm_to_agv_comm.get()
             
             # Add assigned task to local task list
-            print("AGV " + str(self.agv.ID) + ":      Added task " + task.to_string() + " to local task list at "
+            self.agv.my_print("AGV " + str(self.agv.ID) + ":      Added task " + task.to_string() + " to local task list at "
                       + str(self.agv.env.now))
-            self.update_local_task_list(task)
-        
-    # Adds assigned task to local task list
-    def update_local_task_list(self, task):
-        
-        # Put task in queue
-        self.agv.local_task_list.put(task)
+            self.agv.comm.sql_write(self.agv.kb['local_task_list_R' + str(self.agv.ID)], task)
